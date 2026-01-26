@@ -20,7 +20,7 @@ API ini dirancang khusus untuk:
 ---
 
 ## 🏗️ Arsitektur
-
+```
 PostgreSQL (SERUMPUN)
 |
 | SELECT-only
@@ -30,7 +30,7 @@ Go Data API
 | CSV over HTTP
 v
 Flourish / Frontend
-
+```
 
 ---
 
@@ -44,7 +44,7 @@ Flourish / Frontend
 ---
 
 ## 📁 Struktur Folder
-
+```
 server/
 ├── cmd/
 │ └── api/
@@ -62,7 +62,7 @@ server/
 │ └── issues_detail.sql
 ├── .env.example
 └── README.md
-
+```
 
 ---
 

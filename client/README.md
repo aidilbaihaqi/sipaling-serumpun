@@ -54,7 +54,7 @@ Fungsi:
 ---
 
 ## 📁 Struktur Folder
-
+```
 client/
 ├── app/ # Next.js App Router
 │ ├── page.tsx # Landing Page
@@ -71,7 +71,7 @@ client/
 ├── styles/
 ├── public/
 └── README.md
-
+```
 
 ---
 
@@ -109,6 +109,7 @@ export const LINKS = {
   petunjuk: "...",
   dashboardEmbed: "https://public.flourish.studio/..."
 };
+```
 
 🧠 Prinsip UX
 

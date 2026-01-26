@@ -49,6 +49,7 @@ Dashboard menyajikan visualisasi lengkap berbasis data real-time (read-only).
 ---
 
 ## 🧭 Alur Penggunaan (User Flow)
+```
 Landing Page SERUMPUN
 │
 ├─ Informasi singkat & ringkasan progres
@@ -59,6 +60,7 @@ Landing Page SERUMPUN
 │
 v
 Dashboard Monitoring & Evaluasi
+```
 
 
 ---
@@ -110,6 +112,7 @@ Landing Page (Overview) ──> Dashboard Page (Detail)
 
 ## 📁 Struktur Repository
 
+```
 ├── client/ # Frontend (Landing Page & Dashboard Page)
 │ └── README.md
 │
@@ -117,7 +120,7 @@ Landing Page (Overview) ──> Dashboard Page (Detail)
 │ └── README.md
 │
 ├── README.md # Dokumentasi utama (file ini)
-
+```
 
 ---
 
