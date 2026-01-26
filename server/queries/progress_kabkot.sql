@@ -48,11 +48,13 @@ SELECT
   COUNT(*) FILTER (
     WHERE status IN ('Dibatalkan','Cancel','Tidak Dilanjutkan')
   ) AS dibatalkan,
-  ROUND(
-    COUNT(*) FILTER (WHERE status IN ('Selesai','Completed')) * 100.0
-    / NULLIF(COUNT(*),0),
-    2
-  ) AS persen_selesai
+  (
+    ROUND(
+      (COUNT(*) FILTER (WHERE status IN ('Selesai','Completed'))::numeric * 100)
+      / NULLIF(COUNT(*)::numeric, 0),
+      2
+    )
+  )::float8 AS persen_selesai
 FROM data
 GROUP BY kab_kota
 ORDER BY persen_selesai ASC;

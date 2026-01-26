@@ -1,6 +1,6 @@
 WITH base AS (
   SELECT
-    i.id AS issue_id,
+    i.id AS issue_id,                -- keep UUID for joins
     i.name AS issue_title,
     s.name AS status,
     i.start_date,
@@ -37,8 +37,8 @@ WITH base AS (
   LEFT JOIN users u ON u.id = ia.assignee_id
   LEFT JOIN issue_labels il ON il.issue_id = i.id AND il.deleted_at IS NULL
   LEFT JOIN labels l ON l.id = il.label_id
-  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'
-    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'
+  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'::uuid
+    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'::uuid
     AND i.deleted_at IS NULL
 ),
 latest_comment AS (
@@ -61,7 +61,7 @@ comment_user AS (
   FROM users u
 )
 SELECT
-  b.issue_id,
+  b.issue_id::text AS issue_id,      -- cast ONLY for CSV output
   b.issue_title,
   CASE
     WHEN b.assignee_id IS NULL THEN 'Belum Ditugaskan'
@@ -87,6 +87,6 @@ SELECT
   b.created_at,
   b.updated_at
 FROM base b
-LEFT JOIN latest_comment lc ON lc.issue_id = b.issue_id
+LEFT JOIN latest_comment lc ON lc.issue_id = b.issue_id   -- uuid = uuid ✅
 LEFT JOIN comment_user cu ON cu.id = lc.comment_by_id
 ORDER BY b.updated_at DESC;

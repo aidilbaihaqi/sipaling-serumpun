@@ -40,9 +40,6 @@ func main() {
 	}
 
 	databaseURL := mustEnv("DATABASE_URL")
-	workspaceName := mustEnv("WORKSPACE_NAME")
-	projectName := mustEnv("PROJECT_NAME")
-	kabkotaKey := mustEnv("KABKOTA_KEY")
 
 	ctx := context.Background()
 	pool, err := db.NewPool(ctx, databaseURL)
@@ -52,12 +49,9 @@ func main() {
 	defer pool.Close()
 
 	srv := &httpx.Server{
-		DB:            pool,
-		Cache:         cache.New(time.Duration(ttlSec) * time.Second),
-		Queries:       queries.New("queries"),
-		WorkspaceName: workspaceName,
-		ProjectName:   projectName,
-		KabkotaKey:    kabkotaKey,
+		DB:      pool,
+		Cache:   cache.New(time.Duration(ttlSec) * time.Second),
+		Queries: queries.New("queries"),
 	}
 
 	h := httpx.NewRouter(srv)

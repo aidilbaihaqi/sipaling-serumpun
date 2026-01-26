@@ -17,8 +17,8 @@ WITH base AS (
   LEFT JOIN users u ON u.id = ia.assignee_id
   JOIN issue_labels il ON il.issue_id = i.id AND il.deleted_at IS NULL
   JOIN labels l ON l.id = il.label_id
-  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'
-    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'
+  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'::uuid
+    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'::uuid
     AND i.deleted_at IS NULL
 ),
 data AS (
@@ -44,10 +44,13 @@ SELECT
   bidang,
   COUNT(*) AS total,
   COUNT(*) FILTER (WHERE status IN ('Selesai','Completed')) AS selesai,
-  ROUND(
-    COUNT(*) FILTER (WHERE status IN ('Selesai','Completed')) * 100.0 / NULLIF(COUNT(*),0),
-    2
-  ) AS persen_selesai
+  (
+    ROUND(
+      (COUNT(*) FILTER (WHERE status IN ('Selesai','Completed'))::numeric * 100)
+      / NULLIF(COUNT(*)::numeric, 0),
+      2
+    )
+  )::float8 AS persen_selesai
 FROM data
 GROUP BY kab_kota, bidang
 ORDER BY kab_kota, bidang;

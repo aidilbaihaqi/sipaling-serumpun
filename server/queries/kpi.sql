@@ -1,36 +1,37 @@
-WITH base AS (
+  WITH base AS (
+    SELECT
+      s.name AS status,
+      ia.assignee_id,
+      SUBSTRING(
+        COALESCE(u.display_name,'') || ' ' ||
+        COALESCE(u.first_name,'')   || ' ' ||
+        COALESCE(u.last_name,''),
+        '(21[0-9]{2})'
+      ) AS kab_kode
+    FROM issues i
+    JOIN projects p ON p.id = i.project_id
+    JOIN workspaces w ON w.id = p.workspace_id
+    JOIN states s ON s.id = i.state_id
+    LEFT JOIN issue_assignees ia ON ia.issue_id = i.id AND ia.deleted_at IS NULL
+    LEFT JOIN users u ON u.id = ia.assignee_id
+    WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'
+      AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'
+      AND i.deleted_at IS NULL
+  )
   SELECT
-    s.name AS status,
-    ia.assignee_id,
-    SUBSTRING(
-      COALESCE(u.display_name,'') || ' ' ||
-      COALESCE(u.first_name,'')   || ' ' ||
-      COALESCE(u.last_name,''),
-      '(21[0-9]{2})'
-    ) AS kab_kode
-  FROM issues i
-  JOIN projects p ON p.id = i.project_id
-  JOIN workspaces w ON w.id = p.workspace_id
-  JOIN states s ON s.id = i.state_id
-  LEFT JOIN issue_assignees ia ON ia.issue_id = i.id AND ia.deleted_at IS NULL
-  LEFT JOIN users u ON u.id = ia.assignee_id
-  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'
-    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'
-    AND i.deleted_at IS NULL
-)
-SELECT
-  COUNT(*) AS total,
-  COUNT(*) FILTER (WHERE status IN ('Selesai','Completed')) AS selesai,
-  COUNT(*) FILTER (
-    WHERE status IN ('Dikerjakan','Menunggu','Revisi','On Progress','Perlu Tindak Lanjut')
-  ) AS dikerjakan,
-  COUNT(*) FILTER (
-    WHERE status IN ('Dibatalkan','Cancel','Tidak Dilanjutkan')
-  ) AS dibatalkan,
-  COUNT(*) FILTER (WHERE assignee_id IS NULL) AS belum_ditugaskan,
-  COUNT(*) FILTER (WHERE assignee_id IS NOT NULL AND kab_kode IS NULL) AS kode_tidak_terbaca,
-  ROUND(
-    COUNT(*) FILTER (WHERE status IN ('Selesai','Completed')) * 100.0 / NULLIF(COUNT(*),0),
-    2
-  ) AS persen_selesai
-FROM base;
+    COUNT(*) AS total,
+    COUNT(*) FILTER (WHERE status IN ('Selesai','Completed')) AS selesai,
+    COUNT(*) FILTER (
+      WHERE status IN ('Dikerjakan','Menunggu','Revisi','On Progress','Perlu Tindak Lanjut')
+    ) AS dikerjakan,
+    COUNT(*) FILTER (
+      WHERE status IN ('Dibatalkan','Cancel','Tidak Dilanjutkan')
+    ) AS dibatalkan,
+    COUNT(*) FILTER (WHERE assignee_id IS NULL) AS belum_ditugaskan,
+    COUNT(*) FILTER (WHERE assignee_id IS NOT NULL AND kab_kode IS NULL) AS kode_tidak_terbaca,
+    ROUND(
+      (COUNT(*) FILTER (WHERE status IN ('Selesai','Completed'))::numeric * 100)
+      / NULLIF(COUNT(*)::numeric, 0),
+      2
+    )::float8 AS persen_selesai
+  FROM base;
