@@ -1,128 +1,42 @@
-# SERUMPUN – Frontend (Client)
+# sv
 
-Frontend SERUMPUN merupakan **portal utama** yang menyediakan:
-- Landing Page informatif
-- Ringkasan dashboard (overview)
-- Halaman dashboard monitoring lengkap
-- Akses ke seluruh layanan SERUMPUN
+Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
 
-Frontend dibangun menggunakan **Next.js + TypeScript (TSX)** dan
-menggunakan **JokoUI components** untuk konsistensi UI.
+## Creating a project
 
----
+If you're seeing this, you've probably already done this step. Congrats!
 
-## 🎯 Tujuan Frontend
-
-- Menjadi **gerbang utama** platform SERUMPUN
-- Memberikan **informasi ringkas** kondisi SE2026
-- Menyediakan UX yang mudah untuk:
-  - pimpinan
-  - koordinator bidang
-  - pengguna umum
-- Menyajikan visualisasi data melalui **embed Flourish**
-
----
-
-## 🧭 Konsep Halaman
-
-### 1️⃣ Landing Page (`/`)
-Fungsi:
-- Pengantar platform SERUMPUN
-- Ringkasan progres (KPI & overview)
-- Akses cepat ke:
-  - Portal SERUMPUN (All)
-  - Portal SERUMPUN (Member)
-  - Pendaftaran Pengguna
-  - Petunjuk Penggunaan
-- CTA menuju Dashboard Lengkap
-
-Landing page **tidak menampilkan data detail**, hanya ringkasan.
-
----
-
-### 2️⃣ Dashboard Page (`/dashboard`)
-Fungsi:
-- Monitoring & evaluasi mendalam
-- Visualisasi lengkap:
-  - KPI
-  - Progres per kab/kota
-  - Progres per bidang
-  - Heatmap
-  - Tabel detail + komentar
-- Filter interaktif (melalui Flourish)
-
----
-
-## 📁 Struktur Folder
-```
-client/
-├── app/ # Next.js App Router
-│ ├── page.tsx # Landing Page
-│ ├── dashboard/
-│ │ └── page.tsx # Dashboard Page
-│ └── layout.tsx
-├── components/
-│ ├── Navbar.tsx
-│ ├── Footer.tsx
-│ ├── OverviewCards.tsx
-│ └── FlourishEmbed.tsx
-├── lib/
-│ └── config.ts # Link & konfigurasi
-├── styles/
-├── public/
-└── README.md
+```sh
+# create a new project
+npx sv create my-app
 ```
 
----
+To recreate this project with the same configuration:
 
-## 🧱 Teknologi
-
-- Next.js (App Router)
-- TypeScript (TSX)
-- JokoUI Components
-- CSS / Tailwind (sesuai setup)
-- Flourish Embed (iframe)
-
----
-
-## 📊 Integrasi Dashboard (Flourish)
-
-Visualisasi tidak dibuat di frontend,
-melainkan di **Flourish** dan di-*embed* menggunakan iframe.
-
-Contoh komponen embed:
-
-```tsx
-<iframe
-  src="https://public.flourish.studio/story/XXXXX/"
-  width="100%"
-  height="800"
-  frameBorder="0"
-  loading="lazy"
-/>
-
-// lib/config.ts
-export const LINKS = {
-  portalAll: "...",
-  portalMember: "...",
-  pendaftaran: "...",
-  petunjuk: "...",
-  dashboardEmbed: "https://public.flourish.studio/..."
-};
+```sh
+# recreate this project
+npx sv create --template minimal --types ts --no-install ./
 ```
 
-🧠 Prinsip UX
+## Developing
 
-- Informasi singkat di landing page
-- Data detail hanya di dashboard
-- Mobile-friendly
-- Minim scroll berlebihan
-- Fokus pada keterbacaan data
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
 
-🚀 Pengembangan Selanjutnya
-- Auth / role-based access
-- Mode tampilan khusus pimpinan
-- Integrasi API backend untuk KPI di landing page
-- Dark mode (opsional)
+```sh
+npm run dev
 
-© 2025 – BPS Provinsi Kepulauan Riau
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
+```
+
+## Building
+
+To create a production version of your app:
+
+```sh
+npm run build
+```
+
+You can preview the production build with `npm run preview`.
+
+> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
