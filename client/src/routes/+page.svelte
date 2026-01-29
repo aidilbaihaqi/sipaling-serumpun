@@ -1,43 +1,49 @@
 <script lang="ts">
-    const features = [
+    // Dashboard data - from dashboard/+page.svelte
+    const dummyEmbeds = [
         {
-            icon: "📊",
-            title: "Monitoring Real-time",
-            desc: "Pantau progres SE2026 secara langsung",
+            id: "1",
+            title: "Progres SE2026 per Kabupaten/Kota",
+            type: "chart",
+            color: "#6366f1",
         },
         {
-            icon: "🗺️",
-            title: "Per Kabupaten/Kota",
-            desc: "Detail per wilayah Kepulauan Riau",
+            id: "2",
+            title: "KPI Penugasan",
+            type: "kpi",
+            color: "#22d3ee",
         },
         {
-            icon: "📈",
-            title: "Visualisasi Data",
-            desc: "Grafik dan chart interaktif",
+            id: "3",
+            title: "Heatmap Bidang × Wilayah",
+            type: "heatmap",
+            color: "#a855f7",
         },
         {
-            icon: "👥",
-            title: "Kolaborasi Tim",
-            desc: "Koordinasi antar bidang mudah",
+            id: "4",
+            title: "Tabel Detail Penugasan",
+            type: "table",
+            color: "#f59e0b",
+        },
+        {
+            id: "5",
+            title: "Tren Penyelesaian Mingguan",
+            type: "trend",
+            color: "#22c55e",
+        },
+        {
+            id: "6",
+            title: "Komentar Terbaru",
+            type: "comments",
+            color: "#ec4899",
         },
     ];
 
-    const quickLinks = [
-        {
-            href: "https://plane.serumpun.id",
-            label: "Portal SERUMPUN (All)",
-            icon: "🌐",
-        },
-        {
-            href: "https://plane.serumpun.id/profile",
-            label: "Portal Member",
-            icon: "👤",
-        },
-        {
-            href: "https://docs.serumpun.id",
-            label: "Petunjuk Penggunaan",
-            icon: "📖",
-        },
+    const stats = [
+        { label: "Total Penugasan", value: "1,248", change: "+12%" },
+        { label: "Selesai", value: "892", change: "+8%" },
+        { label: "Dalam Proses", value: "286", change: "-3%" },
+        { label: "Pending", value: "70", change: "-15%" },
     ];
 </script>
 
@@ -49,7 +55,8 @@
     />
 </svelte:head>
 
-<section class="hero">
+<!-- Hero/Landing Section -->
+<section class="hero" id="home">
     <div class="container hero-content">
         <div class="hero-badge animate-fade-in">
             <span class="badge-dot"></span>
@@ -65,108 +72,117 @@
             Kolaborasi dan monitoring kegiatan Sensus Ekonomi 2026<br />
             di Provinsi Kepulauan Riau
         </p>
-
-        <div class="hero-actions animate-fade-in">
-            <a href="/dashboard" class="btn btn-primary btn-lg">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <rect x="3" y="3" width="7" height="7" />
-                    <rect x="14" y="3" width="7" height="7" />
-                    <rect x="14" y="14" width="7" height="7" />
-                    <rect x="3" y="14" width="7" height="7" />
-                </svg>
-                Lihat Dashboard
-            </a>
-            <a
-                href="https://plane.serumpun.id"
-                target="_blank"
-                rel="noopener"
-                class="btn btn-outline btn-lg"
-            >
-                Buka Portal
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <path
-                        d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
-                    />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-            </a>
-        </div>
     </div>
 
     <div class="hero-glow"></div>
 </section>
 
-<section class="features">
+<!-- Dashboard Section -->
+<section class="dashboard-section" id="dashboard">
     <div class="container">
-        <h2 class="section-title">Fitur Utama</h2>
+        <!-- Dashboard Header -->
+        <header class="section-header">
+            <div class="update-badge">
+                <span class="update-dot"></span>
+                Live Update
+            </div>
+            <h2 class="section-title">Dashboard Monitoring</h2>
+            <p class="section-desc">
+                Pantau progres Sensus Ekonomi 2026 secara real-time
+            </p>
+            <span class="last-update"
+                >Terakhir: {new Date().toLocaleString("id-ID")}</span
+            >
+        </header>
 
-        <div class="features-grid">
-            {#each features as feature, i}
-                <div
-                    class="feature-card card"
-                    style="animation-delay: {i * 100}ms"
-                >
-                    <span class="feature-icon">{feature.icon}</span>
-                    <h3 class="feature-title">{feature.title}</h3>
-                    <p class="feature-desc">{feature.desc}</p>
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+            {#each stats as stat}
+                <div class="stat-card card">
+                    <span class="stat-label">{stat.label}</span>
+                    <span class="stat-value">{stat.value}</span>
+                    <span
+                        class="stat-change"
+                        class:positive={stat.change.startsWith("+")}
+                        class:negative={stat.change.startsWith("-")}
+                    >
+                        {stat.change}
+                    </span>
                 </div>
             {/each}
         </div>
-    </div>
-</section>
 
-<section class="quick-access">
-    <div class="container">
-        <h2 class="section-title">Akses Cepat</h2>
+        <!-- Canvas Visualisasi -->
+        <div class="canvas-wrapper">
+            <div class="canvas-header">
+                <h3 class="canvas-title">📊 Canvas Visualisasi</h3>
+                <p class="canvas-desc">
+                    Area untuk menampilkan embed dari berbagai platform
+                </p>
+            </div>
 
-        <div class="links-grid">
-            {#each quickLinks as link}
-                <a
-                    href={link.href}
-                    target="_blank"
-                    rel="noopener"
-                    class="quick-link card"
-                >
-                    <span class="link-icon">{link.icon}</span>
-                    <span class="link-label">{link.label}</span>
-                    <svg
-                        class="link-arrow"
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                        <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                </a>
-            {/each}
+            <div class="canvas-area">
+                <div class="embed-grid">
+                    {#each dummyEmbeds as embed, i}
+                        <div
+                            class="embed-card card"
+                            style="--accent-color: {embed.color}; animation-delay: {i *
+                                100}ms"
+                        >
+                            <div class="embed-header">
+                                <span class="embed-type">{embed.type}</span>
+                                <button class="embed-menu" aria-label="Options">
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <circle cx="12" cy="12" r="1" />
+                                        <circle cx="12" cy="5" r="1" />
+                                        <circle cx="12" cy="19" r="1" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div class="embed-content">
+                                <div class="embed-placeholder">
+                                    <div class="placeholder-icon">
+                                        {#if embed.type === "chart"}
+                                            📊
+                                        {:else if embed.type === "kpi"}
+                                            📈
+                                        {:else if embed.type === "heatmap"}
+                                            🗺️
+                                        {:else if embed.type === "table"}
+                                            📋
+                                        {:else if embed.type === "trend"}
+                                            📉
+                                        {:else}
+                                            💬
+                                        {/if}
+                                    </div>
+                                    <p class="placeholder-text">
+                                        Embed Preview
+                                    </p>
+                                    <span class="placeholder-hint"
+                                        >Flourish / Data Studio</span
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="embed-footer">
+                                <h4 class="embed-title">{embed.title}</h4>
+                            </div>
+                        </div>
+                    {/each}
+                </div>
+            </div>
         </div>
     </div>
 </section>
@@ -227,19 +243,6 @@
         line-height: 1.6;
     }
 
-    .hero-actions {
-        display: flex;
-        gap: var(--spacing-md);
-        flex-wrap: wrap;
-        justify-content: center;
-        margin-top: var(--spacing-md);
-    }
-
-    .btn-lg {
-        padding: var(--spacing-md) var(--spacing-xl);
-        font-size: 1rem;
-    }
-
     .hero-glow {
         position: absolute;
         top: 50%;
@@ -249,89 +252,239 @@
         height: 600px;
         background: radial-gradient(
             circle,
-            rgba(99, 102, 241, 0.2) 0%,
+            rgba(248, 132, 45, 0.12) 0%,
+            rgba(250, 178, 40, 0.08) 40%,
             transparent 70%
         );
         pointer-events: none;
     }
 
-    /* Features Section */
-    .features {
+    /* Dashboard Section */
+    .dashboard-section {
+        background: var(--color-bg-secondary);
+        border-top: 1px solid var(--color-border);
         padding: var(--spacing-3xl) 0;
+        min-height: 100vh;
+        scroll-margin-top: 80px;
     }
 
-    .section-title {
+    .section-header {
         text-align: center;
         margin-bottom: var(--spacing-2xl);
-        font-size: 1.75rem;
-    }
-
-    .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: var(--spacing-lg);
-    }
-
-    .feature-card {
         display: flex;
         flex-direction: column;
         align-items: center;
-        text-align: center;
+        gap: var(--spacing-sm);
+    }
+
+    .update-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--spacing-xs);
+        padding: var(--spacing-xs) var(--spacing-sm);
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        border-radius: var(--radius-full);
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--color-success);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .update-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--color-success);
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+
+    .section-title {
+        font-size: 2rem;
+    }
+
+    .section-desc {
+        color: var(--color-text-muted);
+        font-size: 1.125rem;
+    }
+
+    .last-update {
+        font-size: 0.8125rem;
+        color: var(--color-text-muted);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: var(--spacing-md);
+        margin-bottom: var(--spacing-2xl);
+    }
+
+    .stat-card {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-xs);
+        padding: var(--spacing-lg);
+    }
+
+    .stat-label {
+        font-size: 0.8125rem;
+        color: var(--color-text-muted);
+        font-weight: 500;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--color-text);
+    }
+
+    .stat-change {
+        font-size: 0.8125rem;
+        font-weight: 600;
+    }
+
+    .stat-change.positive {
+        color: var(--color-success);
+    }
+
+    .stat-change.negative {
+        color: var(--color-error);
+    }
+
+    /* Canvas */
+    .canvas-wrapper {
+        background: var(--color-bg);
+        border-radius: var(--radius-xl);
         padding: var(--spacing-xl);
+        border: 1px solid var(--color-border);
+    }
+
+    .canvas-header {
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .canvas-title {
+        font-size: 1.25rem;
+        margin-bottom: var(--spacing-xs);
+    }
+
+    .canvas-desc {
+        color: var(--color-text-muted);
+        font-size: 0.875rem;
+    }
+
+    .canvas-area {
+        background: var(--color-bg-secondary);
+        border: 2px dashed var(--color-border);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-lg);
+        min-height: 400px;
+    }
+
+    .embed-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: var(--spacing-lg);
+    }
+
+    /* Embed Card */
+    .embed-card {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 0;
+        border-left: 3px solid var(--accent-color);
         animation: fadeIn 0.5s ease forwards;
         opacity: 0;
     }
 
-    .feature-icon {
-        font-size: 2.5rem;
-        margin-bottom: var(--spacing-md);
+    .embed-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--spacing-sm) var(--spacing-md);
+        border-bottom: 1px solid var(--color-border);
+        background: rgba(0, 0, 0, 0.02);
     }
 
-    .feature-title {
-        font-size: 1.125rem;
+    .embed-type {
+        font-size: 0.6875rem;
         font-weight: 600;
-        margin-bottom: var(--spacing-sm);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--accent-color);
+        padding: 2px 8px;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: var(--radius-sm);
     }
 
-    .feature-desc {
-        font-size: 0.875rem;
+    .embed-menu {
+        padding: var(--spacing-xs);
         color: var(--color-text-muted);
+        border-radius: var(--radius-sm);
+        transition: all var(--transition-fast);
     }
 
-    /* Quick Access Section */
-    .quick-access {
-        padding: var(--spacing-2xl) 0 var(--spacing-3xl);
+    .embed-menu:hover {
+        color: var(--color-text);
+        background: var(--color-bg-card);
     }
 
-    .links-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: var(--spacing-md);
-    }
-
-    .quick-link {
+    .embed-content {
+        flex: 1;
+        min-height: 180px;
         display: flex;
         align-items: center;
-        gap: var(--spacing-md);
+        justify-content: center;
+        background: linear-gradient(
+            135deg,
+            rgba(0, 0, 0, 0.02) 0%,
+            transparent 100%
+        );
+    }
+
+    .embed-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--spacing-sm);
+        text-align: center;
         padding: var(--spacing-lg);
     }
 
-    .link-icon {
-        font-size: 1.5rem;
+    .placeholder-icon {
+        font-size: 2.5rem;
+        opacity: 0.7;
     }
 
-    .link-label {
-        flex: 1;
+    .placeholder-text {
+        font-size: 0.9375rem;
         font-weight: 500;
+        color: var(--color-text-secondary);
     }
 
-    .link-arrow {
+    .placeholder-hint {
+        font-size: 0.75rem;
         color: var(--color-text-muted);
-        transition: transform var(--transition-fast);
     }
 
-    .quick-link:hover .link-arrow {
-        transform: translateX(4px);
-        color: var(--color-primary-light);
+    .embed-footer {
+        padding: var(--spacing-md);
+        border-top: 1px solid var(--color-border);
+    }
+
+    .embed-title {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--color-text);
+    }
+
+    @media (max-width: 768px) {
+        .embed-grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>

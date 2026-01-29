@@ -3,7 +3,7 @@
 
     const links = [
         { href: "https://kepri.bps.go.id", label: "BPS Kepulauan Riau" },
-        { href: "https://plane.serumpun.id", label: "Portal SERUMPUN" },
+        { href: "https://t.gurind.am/serumpun", label: "Portal SERUMPUN" },
     ];
 </script>
 
@@ -11,7 +11,11 @@
     <div class="container footer-content">
         <div class="footer-brand">
             <div class="brand-logo">
-                <span class="logo-icon">📊</span>
+                <img
+                    src="/images/logo-se2026.jfif"
+                    alt="SE2026 Logo"
+                    class="logo-image"
+                />
                 <span class="logo-text">SERUMPUN</span>
             </div>
             <p class="brand-desc">
@@ -88,15 +92,22 @@
         font-weight: 800;
     }
 
-    .logo-icon {
-        font-size: 1.5rem;
+    .logo-image {
+        height: 32px;
+        width: auto;
+        object-fit: contain;
     }
 
     .logo-text {
-        background: var(--gradient-primary);
+        background: linear-gradient(
+            135deg,
+            var(--color-primary) 0%,
+            var(--color-accent) 100%
+        );
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        font-weight: 800;
     }
 
     .brand-desc {
