@@ -102,18 +102,25 @@ go run ./cmd/api
 ## Cek Health
 GET http://localhost:8080/healthz
 
-📡 Endpoint CSV
-Endpoint	Deskripsi
-/csv/kpi.csv	Ringkasan KPI
-/csv/progress_kabkot.csv	Progres per kab/kota
-/csv/progress_bidang.csv	Progres per bidang
-/csv/heatmap.csv	Heatmap kab/kota × bidang
-/csv/issues_detail.csv	Detail penugasan + komentar
+## 📡 Endpoint API
+
+Semua endpoint menggunakan prefix `/api/v1`:
+
+| Endpoint | Deskripsi |
+|----------|-----------|
+| `/api/v1/kpi.csv` | Ringkasan KPI agregat |
+| `/api/v1/progress_kabkot.csv` | Progres per kab/kota |
+| `/api/v1/progress_bidang.csv` | Progres per bidang |
+| `/api/v1/heatmap.csv` | Heatmap kab/kota × bidang |
+| `/api/v1/issues_detail.csv` | Detail penugasan + komentar |
+| `/api/v1/kpi_provinsi.csv` | KPI Provinsi (Ketua + Anggota Bidang) |
+| `/api/v1/kpi_kabkot.csv` | KPI Kabkot (Kepala Kab/Kot) |
 
 Semua endpoint:
-- Format: text/csv
-- Method: GET
+- Format: `text/csv`
+- Method: `GET`
 - Read-only
+- Cache: 60 detik (configurable)
 
 📊 Sumber Data
 
