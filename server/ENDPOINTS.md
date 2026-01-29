@@ -16,67 +16,7 @@ Response: `ok`
 
 All endpoints return CSV format with `text/csv` content type.
 
-### 1. KPI Agregat
-```
-GET /api/v1/kpi.csv
-```
-
-**Output Columns:**
-- `total`, `selesai`, `dikerjakan`, `dibatalkan`, `belum_ditugaskan`, `kode_tidak_terbaca`, `persen_selesai`
-
-**Description:** Ringkasan KPI keseluruhan untuk SE2026
-
----
-
-### 2. Progress per Kabupaten/Kota
-```
-GET /api/v1/progress_kabkot.csv
-```
-
-**Output Columns:**
-- `kab_kota`, `total`, `selesai`, `dikerjakan`, `dibatalkan`, `persen_selesai`
-
-**Description:** Progress penugasan per 7 kabupaten/kota di Kepri
-
----
-
-### 3. Progress per Bidang
-```
-GET /api/v1/progress_bidang.csv
-```
-
-**Output Columns:**
-- `bidang`, `total`, `selesai`, `dikerjakan`, `dibatalkan`, `persen_selesai`
-
-**Description:** Progress penugasan per bidang (PTI, Analisis, Teknis, Administrasi)
-
----
-
-### 4. Heatmap Kabupaten/Kota × Bidang
-```
-GET /api/v1/heatmap.csv
-```
-
-**Output Columns:**
-- `kab_kota`, `bidang`, `total`, `selesai`, `persen_selesai`
-
-**Description:** Matrix progress per kombinasi kab/kota dan bidang
-
----
-
-### 5. Detail Issues
-```
-GET /api/v1/issues_detail.csv
-```
-
-**Output Columns:**
-- `issue_id`, `issue_title`, `kab_kota`, `bidang`, `status`, `ketua_bidang`, `email_ketua_bidang`, `start_date`, `target_date`, `last_comment`, `comment_time`, `comment_by`, `created_at`, `updated_at`
-
-**Description:** Detail lengkap setiap issue dengan komentar terbaru
-
----
-
-### 6. KPI Provinsi (NEW)
+### 1. KPI Provinsi
 ```
 GET /api/v1/kpi_provinsi.csv
 ```
@@ -84,7 +24,9 @@ GET /api/v1/kpi_provinsi.csv
 **Output Columns:**
 - `nama`, `email`, `bidang`, `instansi`, `jabatan`, `backlog`, `todo`, `in_progress`, `done`, `percent`
 
-**Description:** KPI per pegawai provinsi (Ketua + Anggota Bidang) dengan breakdown status berdasarkan `states.group`
+**Description:** KPI per pegawai provinsi (ALL staff: Pengarah, Ketua Pelaksana, Ketua Sekretariat, Wakil Ketua Sekretariat, Anggota Sekretariat, Ketua Bidang, Anggota Bidang) dengan breakdown status berdasarkan `states.group`
+
+**Total Rows:** ~60 pegawai provinsi
 
 **Status Mapping:**
 - `backlog` → Dicatat
@@ -95,7 +37,7 @@ GET /api/v1/kpi_provinsi.csv
 
 ---
 
-### 7. KPI Kabupaten/Kota (NEW)
+### 2. KPI Kabupaten/Kota
 ```
 GET /api/v1/kpi_kabkot.csv
 ```
@@ -103,9 +45,39 @@ GET /api/v1/kpi_kabkot.csv
 **Output Columns:**
 - `nama`, `email`, `bidang`, `instansi`, `jabatan`, `backlog`, `todo`, `in_progress`, `done`, `percent`
 
-**Description:** KPI per Kepala Kab/Kot dengan cross join semua bidang. Setiap Kepala muncul N× (N = jumlah bidang)
+**Description:** KPI per Ketua di Kabupaten/Kota (Kepala Kab/Kot, Ketua Pelaksana SE, Ketua Sekretariat, Ketua Bidang) dengan breakdown status berdasarkan `states.group`
+
+**Total Rows:** 44 Ketua (2 Kepala + 7 Ketua Pelaksana + 7 Ketua Sekretariat + 28 Ketua Bidang)
 
 **Status Mapping:** (sama dengan KPI Provinsi)
+
+---
+
+### 3. Heatmap Kabupaten/Kota × Bidang
+```
+GET /api/v1/heatmap.csv
+```
+
+**Output Columns:**
+- `kab_kota`, `bidang`, `total`, `selesai`, `persen_selesai`
+
+**Description:** Matrix progress per kombinasi kab/kota dan bidang. Status menggunakan `states.group = 'completed'` untuk menghitung selesai.
+
+**Note:** Cancelled issues are excluded from all calculations.
+
+---
+
+### 4. Detail Issues
+```
+GET /api/v1/issues_detail.csv
+```
+
+**Output Columns:**
+- `issue_id`, `issue_title`, `kab_kota`, `bidang`, `status`, `ketua_bidang`, `email_ketua_bidang`, `start_date`, `target_date`, `last_comment`, `comment_time`, `comment_by`, `created_at`, `updated_at`
+
+**Description:** Detail lengkap setiap issue dengan komentar terbaru. Status menggunakan `states.group` (backlog, unstarted, started, triage, completed).
+
+**Note:** Cancelled issues are excluded from output.
 
 ---
 

@@ -2,7 +2,7 @@ WITH base AS (
   SELECT
     i.id AS issue_id,                -- keep UUID for joins
     i.name AS issue_title,
-    s.name AS status,
+    s."group" AS status,
     i.start_date,
     i.target_date,
     i.created_at,
@@ -40,6 +40,7 @@ WITH base AS (
   WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'::uuid
     AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'::uuid
     AND i.deleted_at IS NULL
+    AND s."group" != 'cancelled'
 ),
 latest_comment AS (
   SELECT DISTINCT ON (ic.issue_id)

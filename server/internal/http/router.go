@@ -14,13 +14,13 @@ func NewRouter(s *Server) http.Handler {
 	})
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/kpi.csv", s.KPI)
-		r.Get("/progress_kabkot.csv", s.ProgressKabkot)
-		r.Get("/progress_bidang.csv", s.ProgressBidang)
-		r.Get("/heatmap.csv", s.Heatmap)
-		r.Get("/issues_detail.csv", s.IssuesDetail)
+		// Core KPI endpoints
 		r.Get("/kpi_provinsi.csv", s.KPIProvinsi)
 		r.Get("/kpi_kabkot.csv", s.KPIKabkot)
+
+		// Supporting endpoints
+		r.Get("/heatmap.csv", s.Heatmap)
+		r.Get("/issues_detail.csv", s.IssuesDetail)
 	})
 
 	return r
