@@ -87,7 +87,126 @@ func (s *Server) Heatmap(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/issues_detail.csv
 func (s *Server) IssuesDetail(w http.ResponseWriter, r *http.Request) {
-	s.serveCSV(w, r, "issues_detail", "issues_detail.sql")
+	// Load directory from CSV
+	csvPath := os.Getenv("DIRECTORY_CSV_PATH")
+	if csvPath == "" {
+		csvPath = "data/daftar_pengguna_serumpun.csv"
+	}
+
+	dir, err := LoadDirectoryFromCSV(csvPath)
+	if err != nil {
+		http.Error(w, "failed to load directory: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Build email -> nama mapping from ALL directory entries (provinsi + kabkot)
+	var namaCases []string
+	allRows := append(dir.Provinsi, dir.Kabkot...)
+	for _, row := range allRows {
+		email := strings.ToLower(row.Email)
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+strings.ReplaceAll(row.Nama, "'", "''")+"'")
+	}
+
+	// Build dynamic SQL
+	sql := `
+-- Issues Detail: Get ketua_bidang nama from CSV
+WITH 
+base AS (
+  SELECT
+    i.id AS issue_id,
+    i.name AS issue_title,
+    s."group" AS status,
+    i.start_date,
+    i.target_date,
+
+    ia.assignee_id,
+    u.email AS assignee_email,
+
+    -- Get nama from CSV, fallback to users table
+    CASE
+` + strings.Join(namaCases, "\n") + `
+      ELSE COALESCE(
+        u.display_name,
+        NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
+        '-'
+      )
+    END AS assignee_name,
+
+    -- ekstraksi kode kab/kota
+    SUBSTRING(
+      COALESCE(u.display_name,'') || ' ' ||
+      COALESCE(u.first_name,'')   || ' ' ||
+      COALESCE(u.last_name,''),
+      '(21[0-9]{2})'
+    ) AS kab_kode,
+
+    l.name AS bidang
+  FROM issues i
+  JOIN projects p ON p.id = i.project_id
+  JOIN workspaces w ON w.id = p.workspace_id
+  JOIN states s ON s.id = i.state_id
+  LEFT JOIN issue_assignees ia ON ia.issue_id = i.id AND ia.deleted_at IS NULL
+  LEFT JOIN users u ON u.id = ia.assignee_id
+  LEFT JOIN issue_labels il ON il.issue_id = i.id AND il.deleted_at IS NULL
+  LEFT JOIN labels l ON l.id = il.label_id
+  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'::uuid
+    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'::uuid
+    AND i.deleted_at IS NULL
+    AND s."group" != 'cancelled'
+),
+latest_comment AS (
+  SELECT DISTINCT ON (ic.issue_id)
+    ic.issue_id,
+    ic.comment_stripped AS last_comment,
+    ic.created_at AS comment_time
+  FROM issue_comments ic
+  ORDER BY ic.issue_id, ic.created_at DESC
+)
+SELECT
+  b.issue_title,
+  CASE
+    WHEN b.assignee_id IS NULL THEN 'Belum Ditugaskan'
+    WHEN b.kab_kode IS NULL THEN 'Kode Kab/Kota Tidak Terbaca'
+    WHEN b.kab_kode = '2101' THEN 'Karimun'
+    WHEN b.kab_kode = '2102' THEN 'Bintan'
+    WHEN b.kab_kode = '2103' THEN 'Natuna'
+    WHEN b.kab_kode = '2104' THEN 'Lingga'
+    WHEN b.kab_kode = '2105' THEN 'Kep. Anambas'
+    WHEN b.kab_kode = '2171' THEN 'Batam'
+    WHEN b.kab_kode = '2172' THEN 'Tanjung Pinang'
+    ELSE 'Lainnya'
+  END AS kab_kota,
+  COALESCE(b.bidang, '-') AS bidang,
+  b.status,
+  b.assignee_name AS ketua_bidang,
+  COALESCE(b.assignee_email, '-') AS email_ketua_bidang,
+  b.start_date,
+  b.target_date,
+  lc.last_comment,
+  lc.comment_time
+FROM base b
+LEFT JOIN latest_comment lc ON lc.issue_id = b.issue_id
+ORDER BY b.issue_title;
+`
+
+	// Execute query
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	b, err := QueryToCSV(ctx, s.DB, sql)
+	if err != nil {
+		http.Error(w, "query failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Set cache
+	s.Cache.Set("issues_detail", b)
+
+	// Write response
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(b)
 }
 
 // GET /api/v1/kpi_provinsi.csv
@@ -106,13 +225,14 @@ func (s *Server) KPIProvinsi(w http.ResponseWriter, r *http.Request) {
 
 	// Build dynamic SQL with email-bidang-jabatan mapping
 	// Only include provinsi staff (Ketua + Anggota Bidang, exclude Sekretariat)
-	var emailCases, bidangCases, jabatanCases []string
+	var emailCases, bidangCases, jabatanCases, namaCases []string
 	var emails []string
 
 	for _, row := range dir.Provinsi {
 		email := strings.ToLower(row.Email)
 		emails = append(emails, "'"+email+"'")
 		emailCases = append(emailCases, "      WHEN LOWER(u.email) = '"+email+"' THEN TRUE")
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+strings.ReplaceAll(row.Nama, "'", "''")+"'")
 		bidangCases = append(bidangCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Bidang+"'")
 		jabatanCases = append(jabatanCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Jabatan+"'")
 	}
@@ -130,11 +250,10 @@ directory AS (
   SELECT 
     u.id AS user_id,
     LOWER(u.email) AS email,
-    COALESCE(
-      u.display_name,
-      NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
-      '-'
-    ) AS nama,
+    CASE
+` + strings.Join(namaCases, "\n") + `
+      ELSE COALESCE(u.display_name, u.first_name || ' ' || u.last_name, '-')
+    END AS nama,
     'BPS Provinsi Kepulauan Riau' AS instansi,
     CASE
 ` + strings.Join(jabatanCases, "\n") + `
@@ -234,13 +353,14 @@ func (s *Server) KPIKabkot(w http.ResponseWriter, r *http.Request) {
 
 	// Build dynamic SQL with email-bidang-instansi-jabatan mapping
 	// Include ALL Ketua: Kepala, Ketua Pelaksana, Ketua Sekretariat, Ketua Bidang
-	var emailCases, bidangCases, instansiCases, jabatanCases []string
+	var emailCases, bidangCases, instansiCases, jabatanCases, namaCases []string
 	var emails []string
 
 	for _, row := range dir.Kabkot {
 		email := strings.ToLower(row.Email)
 		emails = append(emails, "'"+email+"'")
 		emailCases = append(emailCases, "      WHEN LOWER(u.email) = '"+email+"' THEN TRUE")
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+strings.ReplaceAll(row.Nama, "'", "''")+"'")
 		bidangCases = append(bidangCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Bidang+"'")
 		instansiCases = append(instansiCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Instansi+"'")
 		jabatanCases = append(jabatanCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Jabatan+"'")
@@ -259,11 +379,10 @@ directory AS (
   SELECT 
     u.id AS user_id,
     LOWER(u.email) AS email,
-    COALESCE(
-      u.display_name,
-      NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
-      '-'
-    ) AS nama,
+    CASE
+` + strings.Join(namaCases, "\n") + `
+      ELSE COALESCE(u.display_name, u.first_name || ' ' || u.last_name, '-')
+    END AS nama,
     CASE
 ` + strings.Join(instansiCases, "\n") + `
       ELSE 'BPS Kabupaten/Kota'
