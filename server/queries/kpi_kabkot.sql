@@ -1,5 +1,4 @@
 -- KPI Kabkot: Dynamic from CSV (All Ketua)
--- Placeholders: {{NAMA_CASES}}, {{BIDANG_CASES}}, {{INSTANSI_CASES}}, {{JABATAN_CASES}}, {{EMAILS}}, {{WHERE_CLAUSE}}
 WITH 
 directory AS (
   SELECT 

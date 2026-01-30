@@ -1,5 +1,4 @@
 -- Workload: Distribution and balance check
--- Placeholders: {{NAMA_CASES}}, {{INSTANSI_CASES}}, {{SCOPE_CASES}}, {{WHERE_CLAUSE}}
 WITH 
 user_stats AS (
   SELECT
@@ -51,12 +50,12 @@ final AS (
     us.active_issues,
     us.completed_issues,
     us.total_issues,
-    ROUND(aw.avg_active_issues::numeric, 1) AS avg_issues_per_person,
+    ROUND(aw.avg_active_issues::numeric, 1)::float8 AS avg_issues_per_person,
     CASE
       WHEN us.total_issues = 0 THEN 0
       ELSE ROUND((us.completed_issues::numeric * 100) / us.total_issues::numeric, 2)
-    END AS completion_rate,
-    COALESCE(ROUND(us.avg_days_to_complete::numeric, 1), 0) AS avg_days_to_complete,
+    END::float8 AS completion_rate,
+    COALESCE(ROUND(us.avg_days_to_complete::numeric, 1), 0)::float8 AS avg_days_to_complete,
     CASE
       WHEN us.active_issues > aw.avg_active_issues * 1.5 THEN 'Overloaded'
       WHEN us.active_issues < aw.avg_active_issues * 0.5 THEN 'Underutilized'

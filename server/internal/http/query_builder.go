@@ -18,7 +18,14 @@ func buildNamaCases(rows []DirectoryRow) string {
 	var cases []string
 	for _, row := range rows {
 		email := strings.ToLower(row.Email)
-		cases = append(cases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+sanitizeSQL(row.Nama)+"'")
+		nama := sanitizeSQL(row.Nama)
+		if email != "" && nama != "" {
+			cases = append(cases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+nama+"'")
+		}
+	}
+	if len(cases) == 0 {
+		// Return a dummy case that will never match
+		return "      WHEN 1=0 THEN ''"
 	}
 	return strings.Join(cases, "\n")
 }
@@ -28,7 +35,12 @@ func buildScopeCases(rows []DirectoryRow) string {
 	var cases []string
 	for _, row := range rows {
 		email := strings.ToLower(row.Email)
-		cases = append(cases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Scope+"'")
+		if email != "" && row.Scope != "" {
+			cases = append(cases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Scope+"'")
+		}
+	}
+	if len(cases) == 0 {
+		return "      WHEN 1=0 THEN ''"
 	}
 	return strings.Join(cases, "\n")
 }
@@ -38,7 +50,12 @@ func buildInstansiCases(rows []DirectoryRow) string {
 	var cases []string
 	for _, row := range rows {
 		email := strings.ToLower(row.Email)
-		cases = append(cases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Instansi+"'")
+		if email != "" && row.Instansi != "" {
+			cases = append(cases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Instansi+"'")
+		}
+	}
+	if len(cases) == 0 {
+		return "      WHEN 1=0 THEN ''"
 	}
 	return strings.Join(cases, "\n")
 }
@@ -48,7 +65,12 @@ func buildBidangCases(rows []DirectoryRow) string {
 	var cases []string
 	for _, row := range rows {
 		email := strings.ToLower(row.Email)
-		cases = append(cases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Bidang+"'")
+		if email != "" && row.Bidang != "" {
+			cases = append(cases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Bidang+"'")
+		}
+	}
+	if len(cases) == 0 {
+		return "      WHEN 1=0 THEN ''"
 	}
 	return strings.Join(cases, "\n")
 }
@@ -58,7 +80,12 @@ func buildJabatanCases(rows []DirectoryRow) string {
 	var cases []string
 	for _, row := range rows {
 		email := strings.ToLower(row.Email)
-		cases = append(cases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Jabatan+"'")
+		if email != "" && row.Jabatan != "" {
+			cases = append(cases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Jabatan+"'")
+		}
+	}
+	if len(cases) == 0 {
+		return "      WHEN 1=0 THEN ''"
 	}
 	return strings.Join(cases, "\n")
 }
@@ -68,7 +95,13 @@ func buildEmailList(rows []DirectoryRow) string {
 	var emails []string
 	for _, row := range rows {
 		email := strings.ToLower(row.Email)
-		emails = append(emails, "'"+email+"'")
+		if email != "" {
+			emails = append(emails, "'"+email+"'")
+		}
+	}
+	if len(emails) == 0 {
+		// Return a dummy email that will never match
+		return "'__no_email__'"
 	}
 	return strings.Join(emails, ", ")
 }

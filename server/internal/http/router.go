@@ -14,6 +14,10 @@ func NewRouter(s *Server) http.Handler {
 	})
 
 	r.Route("/api/v1", func(r chi.Router) {
+		// Debug endpoints
+		r.Get("/debug/directory", s.DebugDirectory)
+		r.Get("/debug/sql", s.DebugSQL)
+
 		// Core KPI endpoints (using SQL templates)
 		r.Get("/kpi_provinsi.csv", s.KPIProvinsiTemplate)
 		r.Get("/kpi_kabkot.csv", s.KPIKabkotTemplate)

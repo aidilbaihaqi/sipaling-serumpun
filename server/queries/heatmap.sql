@@ -1,5 +1,4 @@
 -- Heatmap: Kabupaten/Kota × Bidang matrix
--- Placeholders: {{HAVING_CLAUSE}}
 WITH base AS (
   SELECT
     s."group" AS status,

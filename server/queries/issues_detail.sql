@@ -1,5 +1,4 @@
 -- Issues Detail: Get ketua_bidang nama from CSV (Provinsi + Kabkot)
--- Placeholders: {{NAMA_CASES}}, {{SCOPE_CASES}}, {{WHERE_CLAUSE}}
 WITH 
 base AS (
   SELECT

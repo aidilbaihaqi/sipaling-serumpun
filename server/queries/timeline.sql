@@ -1,5 +1,4 @@
 -- Timeline: Deadline tracking for Gantt Chart
--- Placeholders: {{NAMA_CASES}}, {{SCOPE_CASES}}, {{WHERE_CLAUSE}}
 WITH 
 base AS (
   SELECT

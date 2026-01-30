@@ -1,5 +1,4 @@
 -- Leaderboard: Top performers ranking
--- Placeholders: {{NAMA_CASES}}, {{INSTANSI_CASES}}, {{SCOPE_CASES}}, {{WHERE_CLAUSE}}
 WITH 
 user_stats AS (
   SELECT
@@ -48,8 +47,8 @@ final AS (
     CASE
       WHEN us.total_issues = 0 THEN 0
       ELSE ROUND((us.total_completed::numeric * 100) / us.total_issues::numeric, 2)
-    END AS completion_rate,
-    COALESCE(ROUND(us.avg_completion_days::numeric, 1), 0) AS avg_completion_days,
+    END::float8 AS completion_rate,
+    COALESCE(ROUND(us.avg_completion_days::numeric, 1), 0)::float8 AS avg_completion_days,
     us.in_progress
   FROM user_stats us
   JOIN users u ON u.id = us.assignee_id

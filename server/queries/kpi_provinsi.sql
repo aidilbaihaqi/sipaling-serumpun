@@ -1,5 +1,4 @@
 -- KPI Provinsi: Dynamic from CSV
--- Placeholders: {{NAMA_CASES}}, {{BIDANG_CASES}}, {{JABATAN_CASES}}, {{EMAILS}}, {{WHERE_CLAUSE}}
 WITH 
 directory AS (
   SELECT 
