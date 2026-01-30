@@ -80,13 +80,142 @@ func (s *Server) ProgressBidang(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/heatmap.csv
 func (s *Server) Heatmap(w http.ResponseWriter, r *http.Request) {
-	// file name MUST match what you saved
-	// if your file is named heatmap_kabkot_bidang.sql, keep it consistent
-	s.serveCSV(w, r, "heatmap", "heatmap_kabkot_bidang.sql")
+	// Parse query parameters for filtering
+	filterKabKota := r.URL.Query().Get("kab_kota")
+	filterBidang := r.URL.Query().Get("bidang")
+
+	// Build cache key with filters
+	cacheKey := "heatmap"
+	if filterKabKota != "" || filterBidang != "" {
+		cacheKey += "_" + filterKabKota + "_" + filterBidang
+	}
+
+	// Check cache
+	if b, ok := s.Cache.Get(cacheKey); ok {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=30")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
+		return
+	}
+
+	// Build WHERE clause for filters
+	var filterClauses []string
+	if filterKabKota != "" {
+		filterClauses = append(filterClauses, "  kab_kota = '"+sanitizeSQL(filterKabKota)+"'")
+	}
+	if filterBidang != "" {
+		filterClauses = append(filterClauses, "  bidang = '"+sanitizeSQL(filterBidang)+"'")
+	}
+
+	havingClause := ""
+	if len(filterClauses) > 0 {
+		havingClause = "\nHAVING\n" + strings.Join(filterClauses, "\n  AND ")
+	}
+
+	// Build SQL with optional filters
+	sql := `
+WITH base AS (
+  SELECT
+    s."group" AS status,
+    l.name AS bidang,
+    ia.assignee_id,
+    SUBSTRING(
+      COALESCE(u.display_name,'') || ' ' ||
+      COALESCE(u.first_name,'')   || ' ' ||
+      COALESCE(u.last_name,''),
+      '(21[0-9]{2})'
+    ) AS kab_kode
+  FROM issues i
+  JOIN projects p ON p.id = i.project_id
+  JOIN workspaces w ON w.id = p.workspace_id
+  JOIN states s ON s.id = i.state_id
+  LEFT JOIN issue_assignees ia ON ia.issue_id = i.id AND ia.deleted_at IS NULL
+  LEFT JOIN users u ON u.id = ia.assignee_id
+  JOIN issue_labels il ON il.issue_id = i.id AND il.deleted_at IS NULL
+  JOIN labels l ON l.id = il.label_id
+  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'::uuid
+    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'::uuid
+    AND i.deleted_at IS NULL
+    AND s."group" != 'cancelled'
+),
+data AS (
+  SELECT
+    CASE
+      WHEN assignee_id IS NULL THEN 'Belum Ditugaskan'
+      WHEN kab_kode IS NULL THEN 'Kode Kab/Kota Tidak Terbaca'
+      WHEN kab_kode = '2101' THEN 'Karimun'
+      WHEN kab_kode = '2102' THEN 'Bintan'
+      WHEN kab_kode = '2103' THEN 'Natuna'
+      WHEN kab_kode = '2104' THEN 'Lingga'
+      WHEN kab_kode = '2105' THEN 'Kep. Anambas'
+      WHEN kab_kode = '2171' THEN 'Batam'
+      WHEN kab_kode = '2172' THEN 'Tanjung Pinang'
+      ELSE 'Lainnya'
+    END AS kab_kota,
+    bidang,
+    status
+  FROM base
+)
+SELECT
+  kab_kota,
+  bidang,
+  COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE status = 'completed') AS selesai,
+  (
+    ROUND(
+      (COUNT(*) FILTER (WHERE status = 'completed')::numeric * 100)
+      / NULLIF(COUNT(*)::numeric, 0),
+      2
+    )
+  )::float8 AS persen_selesai
+FROM data
+GROUP BY kab_kota, bidang` + havingClause + `
+ORDER BY kab_kota, bidang;
+`
+
+	// Execute query
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	b, err := QueryToCSV(ctx, s.DB, sql)
+	if err != nil {
+		http.Error(w, "query failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Set cache
+	s.Cache.Set(cacheKey, b)
+
+	// Write response
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(b)
 }
 
 // GET /api/v1/issues_detail.csv
 func (s *Server) IssuesDetail(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters for filtering
+	filterKabKota := r.URL.Query().Get("kab_kota")
+	filterBidang := r.URL.Query().Get("bidang")
+	filterStatus := r.URL.Query().Get("status")
+
+	// Build cache key with filters
+	cacheKey := "issues_detail"
+	if filterKabKota != "" || filterBidang != "" || filterStatus != "" {
+		cacheKey += "_" + filterKabKota + "_" + filterBidang + "_" + filterStatus
+	}
+
+	// Check cache
+	if b, ok := s.Cache.Get(cacheKey); ok {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=30")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
+		return
+	}
+
 	// Load directory from CSV
 	csvPath := os.Getenv("DIRECTORY_CSV_PATH")
 	if csvPath == "" {
@@ -104,7 +233,24 @@ func (s *Server) IssuesDetail(w http.ResponseWriter, r *http.Request) {
 	allRows := append(dir.Provinsi, dir.Kabkot...)
 	for _, row := range allRows {
 		email := strings.ToLower(row.Email)
-		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+strings.ReplaceAll(row.Nama, "'", "''")+"'")
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+sanitizeSQL(row.Nama)+"'")
+	}
+
+	// Build WHERE clause for filters
+	var filterClauses []string
+	if filterKabKota != "" {
+		filterClauses = append(filterClauses, "  kab_kota = '"+sanitizeSQL(filterKabKota)+"'")
+	}
+	if filterBidang != "" {
+		filterClauses = append(filterClauses, "  bidang = '"+sanitizeSQL(filterBidang)+"'")
+	}
+	if filterStatus != "" {
+		filterClauses = append(filterClauses, "  status = '"+sanitizeSQL(filterStatus)+"'")
+	}
+
+	whereClause := ""
+	if len(filterClauses) > 0 {
+		whereClause = "\nWHERE\n" + strings.Join(filterClauses, "\n  AND ")
 	}
 
 	// Build dynamic SQL
@@ -161,32 +307,35 @@ latest_comment AS (
     ic.created_at AS comment_time
   FROM issue_comments ic
   ORDER BY ic.issue_id, ic.created_at DESC
+),
+final AS (
+  SELECT
+    b.issue_title,
+    CASE
+      WHEN b.assignee_id IS NULL THEN 'Belum Ditugaskan'
+      WHEN b.kab_kode IS NULL THEN 'Kode Kab/Kota Tidak Terbaca'
+      WHEN b.kab_kode = '2101' THEN 'Karimun'
+      WHEN b.kab_kode = '2102' THEN 'Bintan'
+      WHEN b.kab_kode = '2103' THEN 'Natuna'
+      WHEN b.kab_kode = '2104' THEN 'Lingga'
+      WHEN b.kab_kode = '2105' THEN 'Kep. Anambas'
+      WHEN b.kab_kode = '2171' THEN 'Batam'
+      WHEN b.kab_kode = '2172' THEN 'Tanjung Pinang'
+      ELSE 'Lainnya'
+    END AS kab_kota,
+    COALESCE(b.bidang, '-') AS bidang,
+    b.status,
+    b.assignee_name AS ketua_bidang,
+    COALESCE(b.assignee_email, '-') AS email_ketua_bidang,
+    b.start_date,
+    b.target_date,
+    lc.last_comment,
+    lc.comment_time
+  FROM base b
+  LEFT JOIN latest_comment lc ON lc.issue_id = b.issue_id
 )
-SELECT
-  b.issue_title,
-  CASE
-    WHEN b.assignee_id IS NULL THEN 'Belum Ditugaskan'
-    WHEN b.kab_kode IS NULL THEN 'Kode Kab/Kota Tidak Terbaca'
-    WHEN b.kab_kode = '2101' THEN 'Karimun'
-    WHEN b.kab_kode = '2102' THEN 'Bintan'
-    WHEN b.kab_kode = '2103' THEN 'Natuna'
-    WHEN b.kab_kode = '2104' THEN 'Lingga'
-    WHEN b.kab_kode = '2105' THEN 'Kep. Anambas'
-    WHEN b.kab_kode = '2171' THEN 'Batam'
-    WHEN b.kab_kode = '2172' THEN 'Tanjung Pinang'
-    ELSE 'Lainnya'
-  END AS kab_kota,
-  COALESCE(b.bidang, '-') AS bidang,
-  b.status,
-  b.assignee_name AS ketua_bidang,
-  COALESCE(b.assignee_email, '-') AS email_ketua_bidang,
-  b.start_date,
-  b.target_date,
-  lc.last_comment,
-  lc.comment_time
-FROM base b
-LEFT JOIN latest_comment lc ON lc.issue_id = b.issue_id
-ORDER BY b.issue_title;
+SELECT * FROM final` + whereClause + `
+ORDER BY issue_title;
 `
 
 	// Execute query
@@ -200,7 +349,7 @@ ORDER BY b.issue_title;
 	}
 
 	// Set cache
-	s.Cache.Set("issues_detail", b)
+	s.Cache.Set(cacheKey, b)
 
 	// Write response
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
@@ -211,6 +360,25 @@ ORDER BY b.issue_title;
 
 // GET /api/v1/kpi_provinsi.csv
 func (s *Server) KPIProvinsi(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters for filtering
+	filterBidang := r.URL.Query().Get("bidang")
+	filterJabatan := r.URL.Query().Get("jabatan")
+
+	// Build cache key with filters
+	cacheKey := "kpi_provinsi"
+	if filterBidang != "" || filterJabatan != "" {
+		cacheKey += "_" + filterBidang + "_" + filterJabatan
+	}
+
+	// Check cache
+	if b, ok := s.Cache.Get(cacheKey); ok {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=30")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
+		return
+	}
+
 	// Load directory from CSV
 	csvPath := os.Getenv("DIRECTORY_CSV_PATH")
 	if csvPath == "" {
@@ -232,7 +400,7 @@ func (s *Server) KPIProvinsi(w http.ResponseWriter, r *http.Request) {
 		email := strings.ToLower(row.Email)
 		emails = append(emails, "'"+email+"'")
 		emailCases = append(emailCases, "      WHEN LOWER(u.email) = '"+email+"' THEN TRUE")
-		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+strings.ReplaceAll(row.Nama, "'", "''")+"'")
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+sanitizeSQL(row.Nama)+"'")
 		bidangCases = append(bidangCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Bidang+"'")
 		jabatanCases = append(jabatanCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Jabatan+"'")
 	}
@@ -240,6 +408,20 @@ func (s *Server) KPIProvinsi(w http.ResponseWriter, r *http.Request) {
 	if len(emails) == 0 {
 		http.Error(w, "no provinsi staff found in directory", http.StatusInternalServerError)
 		return
+	}
+
+	// Build WHERE clause for filters
+	var filterClauses []string
+	if filterBidang != "" {
+		filterClauses = append(filterClauses, "  d.bidang = '"+sanitizeSQL(filterBidang)+"'")
+	}
+	if filterJabatan != "" {
+		filterClauses = append(filterClauses, "  d.jabatan = '"+sanitizeSQL(filterJabatan)+"'")
+	}
+
+	additionalWhere := ""
+	if len(filterClauses) > 0 {
+		additionalWhere = "\n  AND " + strings.Join(filterClauses, "\n  AND ")
 	}
 
 	// Build dynamic SQL
@@ -313,7 +495,7 @@ SELECT
   END::float8 AS percent
 FROM directory d
 LEFT JOIN issue_agg ia ON ia.user_id = d.user_id AND ia.bidang = d.bidang
-WHERE d.bidang IS NOT NULL
+WHERE d.bidang IS NOT NULL` + additionalWhere + `
 ORDER BY d.bidang, d.jabatan DESC, d.nama;
 `
 
@@ -328,7 +510,7 @@ ORDER BY d.bidang, d.jabatan DESC, d.nama;
 	}
 
 	// Set cache
-	s.Cache.Set("kpi_provinsi", b)
+	s.Cache.Set(cacheKey, b)
 
 	// Write response
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
@@ -339,6 +521,26 @@ ORDER BY d.bidang, d.jabatan DESC, d.nama;
 
 // GET /api/v1/kpi_kabkot.csv
 func (s *Server) KPIKabkot(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters for filtering
+	filterBidang := r.URL.Query().Get("bidang")
+	filterInstansi := r.URL.Query().Get("instansi")
+	filterJabatan := r.URL.Query().Get("jabatan")
+
+	// Build cache key with filters
+	cacheKey := "kpi_kabkot"
+	if filterBidang != "" || filterInstansi != "" || filterJabatan != "" {
+		cacheKey += "_" + filterBidang + "_" + filterInstansi + "_" + filterJabatan
+	}
+
+	// Check cache
+	if b, ok := s.Cache.Get(cacheKey); ok {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=30")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
+		return
+	}
+
 	// Load directory from CSV
 	csvPath := os.Getenv("DIRECTORY_CSV_PATH")
 	if csvPath == "" {
@@ -360,7 +562,7 @@ func (s *Server) KPIKabkot(w http.ResponseWriter, r *http.Request) {
 		email := strings.ToLower(row.Email)
 		emails = append(emails, "'"+email+"'")
 		emailCases = append(emailCases, "      WHEN LOWER(u.email) = '"+email+"' THEN TRUE")
-		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+strings.ReplaceAll(row.Nama, "'", "''")+"'")
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+sanitizeSQL(row.Nama)+"'")
 		bidangCases = append(bidangCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Bidang+"'")
 		instansiCases = append(instansiCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Instansi+"'")
 		jabatanCases = append(jabatanCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Jabatan+"'")
@@ -369,6 +571,23 @@ func (s *Server) KPIKabkot(w http.ResponseWriter, r *http.Request) {
 	if len(emails) == 0 {
 		http.Error(w, "no ketua kabkot found in directory", http.StatusInternalServerError)
 		return
+	}
+
+	// Build WHERE clause for filters
+	var filterClauses []string
+	if filterBidang != "" {
+		filterClauses = append(filterClauses, "  d.bidang = '"+sanitizeSQL(filterBidang)+"'")
+	}
+	if filterInstansi != "" {
+		filterClauses = append(filterClauses, "  d.instansi = '"+sanitizeSQL(filterInstansi)+"'")
+	}
+	if filterJabatan != "" {
+		filterClauses = append(filterClauses, "  d.jabatan = '"+sanitizeSQL(filterJabatan)+"'")
+	}
+
+	additionalWhere := ""
+	if len(filterClauses) > 0 {
+		additionalWhere = "\n  AND " + strings.Join(filterClauses, "\n  AND ")
 	}
 
 	// Build dynamic SQL
@@ -445,7 +664,7 @@ SELECT
   END::float8 AS percent
 FROM directory d
 LEFT JOIN issue_agg ia ON ia.user_id = d.user_id AND ia.bidang = d.bidang
-WHERE d.bidang IS NOT NULL
+WHERE d.bidang IS NOT NULL` + additionalWhere + `
 ORDER BY d.instansi, d.jabatan, d.bidang;
 `
 
@@ -460,11 +679,16 @@ ORDER BY d.instansi, d.jabatan, d.bidang;
 	}
 
 	// Set cache
-	s.Cache.Set("kpi_kabkot", b)
+	s.Cache.Set(cacheKey, b)
 
 	// Write response
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=30")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(b)
+}
+
+// sanitizeSQL escapes single quotes in SQL string literals to prevent SQL injection
+func sanitizeSQL(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
 }
