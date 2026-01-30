@@ -1,4 +1,4 @@
--- KPI Kabkot: Dynamic from CSV (All Ketua)
+-- KPI Provinsi: Dynamic from CSV
 WITH 
 directory AS (
   SELECT 
@@ -8,13 +8,10 @@ directory AS (
 {{NAMA_CASES}}
       ELSE COALESCE(u.display_name, u.first_name || ' ' || u.last_name, '-')
     END AS nama,
-    CASE
-{{INSTANSI_CASES}}
-      ELSE 'BPS Kabupaten/Kota'
-    END AS instansi,
+    'BPS Provinsi Kepulauan Riau' AS instansi,
     CASE
 {{JABATAN_CASES}}
-      ELSE 'Ketua'
+      ELSE 'Anggota'
     END AS jabatan,
     CASE
 {{BIDANG_CASES}}
@@ -71,4 +68,4 @@ SELECT
 FROM directory d
 LEFT JOIN issue_agg ia ON ia.user_id = d.user_id AND ia.bidang = d.bidang
 WHERE d.bidang IS NOT NULL{{WHERE_CLAUSE}}
-ORDER BY d.instansi, d.jabatan, d.bidang;
+ORDER BY d.bidang, d.jabatan DESC, d.nama;

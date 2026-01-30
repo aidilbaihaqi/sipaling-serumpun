@@ -117,21 +117,32 @@ func LoadDirectoryFromCSV(path string) (DirectoryResult, error) {
 		}
 	}
 
-	// 3) build kabkot rows (only Kepala Kab/Kot) cross join bidangList
+	// 3) build kabkot rows (ALL Ketua: Kepala, Ketua Pelaksana, Ketua Sekretariat, Ketua Bidang)
 	var kab []DirectoryRow
 	for _, rr := range raws {
 		scope := deriveScope(rr.instansi)
 		if scope != "kabkot" {
 			continue
 		}
-		// treat "Kepala Kab/Kot" as Ketua
-		if strings.EqualFold(rr.jabatan, "Kepala Kab/Kot") {
-			for _, b := range bidangList {
-				kab = append(kab, DirectoryRow{
-					Email: rr.email, Nama: rr.nama, Instansi: rr.instansi,
-					Scope: "kabkot", Jabatan: "Ketua", Bidang: b,
-				})
-			}
+
+		// Check if it's Ketua Bidang
+		jab, bidang, isBidang := parseJabatanBidang(rr.jabatan)
+		if isBidang && jab == "Ketua" {
+			// Ketua Bidang X
+			kab = append(kab, DirectoryRow{
+				Email: rr.email, Nama: rr.nama, Instansi: rr.instansi,
+				Scope: "kabkot", Jabatan: "Ketua Bidang", Bidang: bidang,
+			})
+			continue
+		}
+
+		// Check other Ketua roles (Kepala, Ketua Pelaksana, Ketua Sekretariat)
+		jabNorm, bidangNorm := parseOtherJabatan(rr.jabatan)
+		if jabNorm != "" && (strings.Contains(strings.ToLower(jabNorm), "ketua") || strings.Contains(strings.ToLower(jabNorm), "kepala")) {
+			kab = append(kab, DirectoryRow{
+				Email: rr.email, Nama: rr.nama, Instansi: rr.instansi,
+				Scope: "kabkot", Jabatan: jabNorm, Bidang: bidangNorm,
+			})
 		}
 	}
 
@@ -183,12 +194,14 @@ func parseJabatanBidang(jabatan string) (jabatanNorm, bidang string, ok bool) {
 	return "", "", false
 }
 
-// parseOtherJabatan handles non-bidang roles like Pengarah, Ketua Pelaksana, Sekretariat
+// parseOtherJabatan handles non-bidang roles like Pengarah, Ketua Pelaksana, Sekretariat, Kepala
 func parseOtherJabatan(jabatan string) (jabatanNorm, bidang string) {
 	j := strings.TrimSpace(jabatan)
 	jLower := strings.ToLower(j)
 
 	switch {
+	case strings.Contains(jLower, "kepala kab/kot"):
+		return "Kepala Kab/Kot", "Umum"
 	case strings.Contains(jLower, "pengarah"):
 		return "Pengarah", "Umum"
 	case strings.Contains(jLower, "ketua pelaksana"):

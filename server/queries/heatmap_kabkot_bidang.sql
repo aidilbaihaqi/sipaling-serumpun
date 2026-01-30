@@ -1,6 +1,6 @@
 WITH base AS (
   SELECT
-    s.name AS status,
+    s."group" AS status,
     l.name AS bidang,
     ia.assignee_id,
     SUBSTRING(
@@ -20,6 +20,7 @@ WITH base AS (
   WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'::uuid
     AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'::uuid
     AND i.deleted_at IS NULL
+    AND s."group" != 'cancelled'
 ),
 data AS (
   SELECT
@@ -43,10 +44,10 @@ SELECT
   kab_kota,
   bidang,
   COUNT(*) AS total,
-  COUNT(*) FILTER (WHERE status IN ('Selesai','Completed')) AS selesai,
+  COUNT(*) FILTER (WHERE status = 'completed') AS selesai,
   (
     ROUND(
-      (COUNT(*) FILTER (WHERE status IN ('Selesai','Completed'))::numeric * 100)
+      (COUNT(*) FILTER (WHERE status = 'completed')::numeric * 100)
       / NULLIF(COUNT(*)::numeric, 0),
       2
     )

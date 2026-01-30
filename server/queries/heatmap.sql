@@ -1,7 +1,8 @@
+-- Heatmap: Kabupaten/Kota × Bidang matrix
 WITH base AS (
   SELECT
-    i.id,
-    s.name AS status,
+    s."group" AS status,
+    l.name AS bidang,
     ia.assignee_id,
     SUBSTRING(
       COALESCE(u.display_name,'') || ' ' ||
@@ -13,13 +14,14 @@ WITH base AS (
   JOIN projects p ON p.id = i.project_id
   JOIN workspaces w ON w.id = p.workspace_id
   JOIN states s ON s.id = i.state_id
-  LEFT JOIN issue_assignees ia
-    ON ia.issue_id = i.id
-   AND ia.deleted_at IS NULL
+  LEFT JOIN issue_assignees ia ON ia.issue_id = i.id AND ia.deleted_at IS NULL
   LEFT JOIN users u ON u.id = ia.assignee_id
-  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'
-    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'
+  JOIN issue_labels il ON il.issue_id = i.id AND il.deleted_at IS NULL
+  JOIN labels l ON l.id = il.label_id
+  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'::uuid
+    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'::uuid
     AND i.deleted_at IS NULL
+    AND s."group" != 'cancelled'
 ),
 data AS (
   SELECT
@@ -35,26 +37,22 @@ data AS (
       WHEN kab_kode = '2172' THEN 'Tanjung Pinang'
       ELSE 'Lainnya'
     END AS kab_kota,
+    bidang,
     status
   FROM base
 )
 SELECT
   kab_kota,
+  bidang,
   COUNT(*) AS total,
-  COUNT(*) FILTER (WHERE status IN ('Selesai','Completed')) AS selesai,
-  COUNT(*) FILTER (
-    WHERE status IN ('Dikerjakan','Menunggu','Revisi','On Progress','Perlu Tindak Lanjut')
-  ) AS dikerjakan,
-  COUNT(*) FILTER (
-    WHERE status IN ('Dibatalkan','Cancel','Tidak Dilanjutkan')
-  ) AS dibatalkan,
+  COUNT(*) FILTER (WHERE status = 'completed') AS selesai,
   (
     ROUND(
-      (COUNT(*) FILTER (WHERE status IN ('Selesai','Completed'))::numeric * 100)
+      (COUNT(*) FILTER (WHERE status = 'completed')::numeric * 100)
       / NULLIF(COUNT(*)::numeric, 0),
       2
     )
   )::float8 AS persen_selesai
 FROM data
-GROUP BY kab_kota
-ORDER BY persen_selesai ASC;
+GROUP BY kab_kota, bidang{{HAVING_CLAUSE}}
+ORDER BY kab_kota, bidang;

@@ -1,4 +1,4 @@
--- Issues Detail: Get ketua_bidang nama from CSV (Provinsi + Kabkot)
+-- Timeline: Deadline tracking for Gantt Chart
 WITH 
 base AS (
   SELECT
@@ -7,18 +7,15 @@ base AS (
     s."group" AS status,
     i.start_date,
     i.target_date,
+    i.created_at,
 
     ia.assignee_id,
     u.email AS assignee_email,
 
-    -- Get nama from CSV, fallback to users table
+    -- Get nama from CSV
     CASE
 {{NAMA_CASES}}
-      ELSE COALESCE(
-        u.display_name,
-        NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
-        '-'
-      )
+      ELSE COALESCE(u.display_name, u.first_name || ' ' || u.last_name, '-')
     END AS assignee_name,
 
     -- Get scope from CSV
@@ -49,18 +46,11 @@ base AS (
     AND i.deleted_at IS NULL
     AND s."group" != 'cancelled'
 ),
-latest_comment AS (
-  SELECT DISTINCT ON (ic.issue_id)
-    ic.issue_id,
-    ic.comment_stripped AS last_comment,
-    ic.created_at AS comment_time
-  FROM issue_comments ic
-  ORDER BY ic.issue_id, ic.created_at DESC
-),
 final AS (
   SELECT
     b.scope,
     b.issue_title,
+    b.assignee_name AS ketua_bidang,
     CASE
       WHEN b.assignee_id IS NULL THEN 'Belum Ditugaskan'
       WHEN b.scope = 'provinsi' THEN 'BPS Provinsi Kepulauan Riau'
@@ -76,14 +66,36 @@ final AS (
     END AS kab_kota,
     COALESCE(b.bidang, '-') AS bidang,
     b.status,
-    b.assignee_name AS ketua_bidang,
-    COALESCE(b.assignee_email, '-') AS email_ketua_bidang,
     b.start_date,
     b.target_date,
-    lc.last_comment,
-    lc.comment_time
+    CASE
+      WHEN b.target_date IS NULL THEN NULL
+      ELSE (b.target_date - CURRENT_DATE)
+    END AS days_remaining,
+    CASE
+      WHEN b.target_date IS NULL THEN 'No Deadline'
+      WHEN b.status = 'completed' THEN 'Completed'
+      WHEN b.target_date < CURRENT_DATE THEN 'Overdue'
+      WHEN (b.target_date - CURRENT_DATE) <= 7 THEN 'Warning'
+      ELSE 'On Track'
+    END AS deadline_status,
+    CASE
+      WHEN b.status = 'completed' THEN 100
+      WHEN b.status IN ('started', 'triage') THEN 50
+      WHEN b.status = 'unstarted' THEN 25
+      ELSE 0
+    END AS progress_percent
   FROM base b
-  LEFT JOIN latest_comment lc ON lc.issue_id = b.issue_id
 )
 SELECT * FROM final{{WHERE_CLAUSE}}
-ORDER BY scope, issue_title;
+ORDER BY 
+  CASE 
+    WHEN deadline_status = 'Overdue' THEN 1
+    WHEN deadline_status = 'Warning' THEN 2
+    WHEN deadline_status = 'On Track' THEN 3
+    WHEN deadline_status = 'Completed' THEN 4
+    ELSE 5
+  END,
+  days_remaining NULLS LAST,
+  scope,
+  kab_kota;
