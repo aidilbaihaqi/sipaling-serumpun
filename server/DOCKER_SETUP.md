@@ -4,6 +4,7 @@
 - Docker dan Docker Compose sudah terinstall di VPS
 - Akses SSH ke VPS
 - Port 8080 terbuka di firewall VPS
+- File CSV `daftar_pengguna_serumpun.csv` ada di folder `data/`
 
 ## Langkah Setup
 
@@ -19,13 +20,26 @@ APP_PORT=8080
 DATABASE_URL=postgres://dashboard:Dash21board@postgresql.gurind.am:5433/plane
 CACHE_TTL_SECONDS=60
 
+# CSV Directory Path (relative to app root)
+DIRECTORY_CSV_PATH=data/daftar_pengguna_serumpun.csv
+
 WORKSPACE_NAME=Platform Serumpun
 PROJECT_NAME=Sensus Ekonomi 2026
 
 KABKOTA_KEY=kab_kota
 ```
 
-### 2. Build dan Jalankan Container
+### 2. Pastikan File CSV Ada
+```bash
+# Cek apakah file CSV ada
+ls -la data/daftar_pengguna_serumpun.csv
+
+# Jika belum ada, copy file CSV ke folder data/
+mkdir -p data
+cp /path/to/daftar_pengguna_serumpun.csv data/
+```
+
+### 3. Build dan Jalankan Container
 ```bash
 # Build image
 docker-compose build
@@ -34,7 +48,7 @@ docker-compose build
 docker-compose up -d
 ```
 
-### 3. Cek Status Container
+### 4. Cek Status Container
 ```bash
 # Lihat container yang berjalan
 docker-compose ps
@@ -43,13 +57,13 @@ docker-compose ps
 docker-compose logs -f serumpun-api
 ```
 
-### 4. Test API
+### 5. Test API
 ```bash
 # Health check
 curl http://ALAMAT_IP_VPS:8080/healthz
 
 # Test endpoint CSV
-curl http://ALAMAT_IP_VPS:8080/csv/kpi.csv
+curl http://ALAMAT_IP_VPS:8080/api/v1/kpi_provinsi.csv
 ```
 
 ## Akses dari Luar VPS
@@ -61,11 +75,13 @@ http://ALAMAT_IP_VPS:8080
 
 Contoh endpoint:
 - `http://ALAMAT_IP_VPS:8080/healthz`
-- `http://ALAMAT_IP_VPS:8080/csv/kpi.csv`
-- `http://ALAMAT_IP_VPS:8080/csv/progress_kabkot.csv`
-- `http://ALAMAT_IP_VPS:8080/csv/progress_bidang.csv`
-- `http://ALAMAT_IP_VPS:8080/csv/heatmap.csv`
-- `http://ALAMAT_IP_VPS:8080/csv/issues_detail.csv`
+- `http://ALAMAT_IP_VPS:8080/api/v1/kpi_provinsi.csv`
+- `http://ALAMAT_IP_VPS:8080/api/v1/kpi_kabkot.csv`
+- `http://ALAMAT_IP_VPS:8080/api/v1/heatmap.csv`
+- `http://ALAMAT_IP_VPS:8080/api/v1/issues_detail.csv`
+- `http://ALAMAT_IP_VPS:8080/api/v1/timeline.csv`
+- `http://ALAMAT_IP_VPS:8080/api/v1/leaderboard.csv`
+- `http://ALAMAT_IP_VPS:8080/api/v1/workload.csv`
 
 ## Perintah Docker Berguna
 
@@ -85,11 +101,28 @@ docker-compose logs -f
 # Masuk ke container
 docker-compose exec serumpun-api sh
 
+# Cek apakah file CSV ada di container
+docker-compose exec serumpun-api ls -la data/
+
 # Hapus container dan image
 docker-compose down --rmi all
 ```
 
 ## Troubleshooting
+
+### Error: "failed to load directory: open directory csv"
+Ini berarti file CSV tidak ditemukan di container. Solusi:
+```bash
+# 1. Pastikan file CSV ada di folder data/ sebelum build
+ls -la data/daftar_pengguna_serumpun.csv
+
+# 2. Rebuild container
+docker-compose down
+docker-compose up -d --build
+
+# 3. Verifikasi file ada di container
+docker-compose exec serumpun-api ls -la data/
+```
 
 ### Container tidak bisa start
 ```bash

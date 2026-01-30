@@ -1,7 +1,7 @@
 # SERUMPUN API Endpoints
 
 Base URL: `http://localhost:8080`
-
+Server URL: `http://103.31.38.56:8080`
 ## Health Check
 
 ```

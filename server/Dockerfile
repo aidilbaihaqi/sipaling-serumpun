@@ -27,6 +27,9 @@ COPY --from=builder /app/api .
 # Copy queries folder
 COPY --from=builder /app/queries ./queries
 
+# Copy data folder (CSV directory)
+COPY --from=builder /app/data ./data
+
 # Expose port
 EXPOSE 8080
 
