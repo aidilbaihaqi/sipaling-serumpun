@@ -128,26 +128,30 @@ GET /api/v1/issues_detail.csv
 ```
 
 **Output Columns:**
-- `issue_title`, `kab_kota`, `bidang`, `status`, `ketua_bidang`, `email_ketua_bidang`, `start_date`, `target_date`, `last_comment`, `comment_time`
+- `scope`, `issue_title`, `kab_kota`, `bidang`, `status`, `ketua_bidang`, `email_ketua_bidang`, `start_date`, `target_date`, `last_comment`, `comment_time`
 
-**Description:** Detail lengkap setiap issue dengan komentar terbaru. Status menggunakan `states.group` (backlog, unstarted, started, triage, completed).
+**Description:** Detail lengkap setiap issue dengan komentar terbaru. Status menggunakan `states.group` (backlog, unstarted, started, triage, completed). **Sekarang support provinsi dan kabkot!**
 
 **Query Parameters (Optional):**
-- `kab_kota` - Filter by kab/kota (e.g., `Batam`, `Karimun`, `Bintan`, `Natuna`, `Lingga`, `Kep. Anambas`, `Tanjung Pinang`)
+- `scope` - Filter by scope (`provinsi` | `kabkot`) ⭐ **NEW**
+- `kab_kota` - Filter by kab/kota (e.g., `Batam`, `Karimun`, `BPS Provinsi Kepulauan Riau`)
 - `bidang` - Filter by bidang (e.g., `Sosial`, `Produksi`, `Distribusi`, `Nerwilis`)
 - `status` - Filter by status (e.g., `backlog`, `unstarted`, `started`, `triage`, `completed`)
 
 **Examples:**
 ```
+GET /api/v1/issues_detail.csv?scope=provinsi
+GET /api/v1/issues_detail.csv?scope=kabkot
 GET /api/v1/issues_detail.csv?status=completed
-GET /api/v1/issues_detail.csv?kab_kota=Batam
-GET /api/v1/issues_detail.csv?bidang=Sosial
+GET /api/v1/issues_detail.csv?scope=kabkot&kab_kota=Batam
+GET /api/v1/issues_detail.csv?scope=provinsi&bidang=Sosial
 GET /api/v1/issues_detail.csv?kab_kota=Batam&bidang=Produksi&status=started
 ```
 
 **Data Source:**
 - Nama ketua_bidang diambil dari `data/daftar_pengguna_serumpun.csv` (bukan dari `users.display_name`)
 - Mapping email → nama dilakukan secara dinamis saat runtime
+- Scope detection: Provinsi staff akan muncul dengan `kab_kota = 'BPS Provinsi Kepulauan Riau'`
 
 **Removed Columns:** (tidak ditampilkan lagi)
 - `issue_id` - UUID internal tidak diperlukan untuk visualisasi
@@ -158,6 +162,122 @@ GET /api/v1/issues_detail.csv?kab_kota=Batam&bidang=Produksi&status=started
 **Note:** Cancelled issues are excluded from output.
 
 **Implementation:** Dynamic SQL generation in Go (no static SQL file)
+
+---
+
+### 5. Timeline / Gantt Chart ⭐ NEW
+```
+GET /api/v1/timeline.csv
+```
+
+**Output Columns:**
+- `scope`, `issue_title`, `ketua_bidang`, `kab_kota`, `bidang`, `status`, `start_date`, `target_date`, `days_remaining`, `deadline_status`, `progress_percent`
+
+**Description:** Timeline tracking untuk Gantt Chart visualization. Menampilkan deadline status dengan color coding untuk proactive management.
+
+**Query Parameters (Optional):**
+- `scope` - Filter by scope (`provinsi` | `kabkot`)
+- `kab_kota` - Filter by kab/kota
+- `bidang` - Filter by bidang
+- `status` - Filter by status
+
+**Deadline Status:**
+- 🔴 `Overdue` - Melewati target_date
+- 🟡 `Warning` - Kurang dari 7 hari
+- 🟢 `On Track` - Lebih dari 7 hari
+- ⚫ `Completed` - Sudah selesai
+- ⚪ `No Deadline` - Tidak ada target_date
+
+**Progress Percent:**
+- `completed` = 100%
+- `started` / `triage` = 50%
+- `unstarted` = 25%
+- `backlog` = 0%
+
+**Examples:**
+```
+GET /api/v1/timeline.csv?scope=provinsi
+GET /api/v1/timeline.csv?scope=kabkot&kab_kota=Batam
+GET /api/v1/timeline.csv?deadline_status=Overdue
+GET /api/v1/timeline.csv?bidang=Sosial&status=started
+```
+
+**Chart Recommendation:** Gantt Chart, Timeline Chart
+
+**Implementation:** Dynamic SQL generation in Go
+
+---
+
+### 6. Leaderboard / Ranking ⭐ NEW
+```
+GET /api/v1/leaderboard.csv
+```
+
+**Output Columns:**
+- `rank`, `nama`, `instansi`, `scope`, `bidang`, `total_completed`, `total_issues`, `completion_rate`, `avg_completion_days`, `in_progress`, `badge`
+
+**Description:** Ranking pegawai berdasarkan performa (completion rate, total completed, avg completion days). Untuk motivasi dan recognition.
+
+**Query Parameters (Optional):**
+- `scope` - Filter by scope (`provinsi` | `kabkot`)
+- `bidang` - Filter by bidang
+
+**Badge System:**
+- 🥇 `Gold` - Rank 1-3
+- 🥈 `Silver` - Rank 4-10
+- 🥉 `Bronze` - Rank 11-20
+- 🎖️ `Participant` - Rank 21+
+
+**Ranking Criteria (in order):**
+1. Completion rate (higher is better)
+2. Total completed (higher is better)
+3. Avg completion days (lower is better)
+
+**Examples:**
+```
+GET /api/v1/leaderboard.csv
+GET /api/v1/leaderboard.csv?scope=provinsi
+GET /api/v1/leaderboard.csv?scope=kabkot
+GET /api/v1/leaderboard.csv?bidang=Sosial
+GET /api/v1/leaderboard.csv?scope=kabkot&bidang=Produksi
+```
+
+**Chart Recommendation:** Horizontal Bar Chart, Table with badges
+
+**Implementation:** Dynamic SQL generation in Go
+
+---
+
+### 7. Workload Distribution ⭐ NEW
+```
+GET /api/v1/workload.csv
+```
+
+**Output Columns:**
+- `nama`, `instansi`, `scope`, `bidang`, `active_issues`, `completed_issues`, `total_issues`, `avg_issues_per_person`, `completion_rate`, `avg_days_to_complete`, `workload_status`
+
+**Description:** Analisis distribusi beban kerja untuk identifikasi overload/underload dan redistribusi tugas yang lebih adil.
+
+**Query Parameters (Optional):**
+- `scope` - Filter by scope (`provinsi` | `kabkot`)
+- `bidang` - Filter by bidang
+
+**Workload Status:**
+- 🔴 `Overloaded` - Active issues > 1.5× average
+- 🟢 `Balanced` - Active issues within normal range
+- 🟡 `Underutilized` - Active issues < 0.5× average
+
+**Examples:**
+```
+GET /api/v1/workload.csv
+GET /api/v1/workload.csv?scope=provinsi
+GET /api/v1/workload.csv?scope=kabkot
+GET /api/v1/workload.csv?bidang=Sosial
+```
+
+**Chart Recommendation:** Bubble Chart (X: active_issues, Y: completion_rate, Size: avg_days_to_complete, Color: workload_status)
+
+**Implementation:** Dynamic SQL generation in Go
 
 ---
 
@@ -183,29 +303,65 @@ curl http://localhost:8080/api/v1/heatmap.csv
 # Get Heatmap for Batam only
 curl "http://localhost:8080/api/v1/heatmap.csv?kab_kota=Batam"
 
-# Get Issues Detail
+# Get Issues Detail (all)
 curl http://localhost:8080/api/v1/issues_detail.csv
+
+# Get Issues Detail for provinsi only
+curl "http://localhost:8080/api/v1/issues_detail.csv?scope=provinsi"
+
+# Get Issues Detail for kabkot only
+curl "http://localhost:8080/api/v1/issues_detail.csv?scope=kabkot"
 
 # Get completed issues only
 curl "http://localhost:8080/api/v1/issues_detail.csv?status=completed"
 
 # Get issues for Batam in Produksi bidang
 curl "http://localhost:8080/api/v1/issues_detail.csv?kab_kota=Batam&bidang=Produksi"
+
+# Get Timeline (all)
+curl http://localhost:8080/api/v1/timeline.csv
+
+# Get Timeline for provinsi with overdue issues
+curl "http://localhost:8080/api/v1/timeline.csv?scope=provinsi"
+
+# Get Leaderboard (all)
+curl http://localhost:8080/api/v1/leaderboard.csv
+
+# Get Leaderboard for kabkot only
+curl "http://localhost:8080/api/v1/leaderboard.csv?scope=kabkot"
+
+# Get Workload analysis
+curl http://localhost:8080/api/v1/workload.csv
+
+# Get Workload for provinsi Sosial bidang
+curl "http://localhost:8080/api/v1/workload.csv?scope=provinsi&bidang=Sosial"
 ```
 
 ### Flourish Live CSV
 ```
-# Without filters
+# Core KPI
 https://your-domain.com/api/v1/kpi_provinsi.csv
 https://your-domain.com/api/v1/kpi_kabkot.csv
 https://your-domain.com/api/v1/heatmap.csv
-https://your-domain.com/api/v1/issues_detail.csv
+
+# Issues & Timeline
+https://your-domain.com/api/v1/issues_detail.csv?scope=provinsi
+https://your-domain.com/api/v1/issues_detail.csv?scope=kabkot
+https://your-domain.com/api/v1/timeline.csv?scope=provinsi
+https://your-domain.com/api/v1/timeline.csv?scope=kabkot
+
+# Analytics
+https://your-domain.com/api/v1/leaderboard.csv?scope=provinsi
+https://your-domain.com/api/v1/leaderboard.csv?scope=kabkot
+https://your-domain.com/api/v1/workload.csv
 
 # With filters (URL encoded)
 https://your-domain.com/api/v1/kpi_provinsi.csv?bidang=Sosial
 https://your-domain.com/api/v1/kpi_kabkot.csv?instansi=BPS%20Kota%20Batam
 https://your-domain.com/api/v1/heatmap.csv?kab_kota=Batam
 https://your-domain.com/api/v1/issues_detail.csv?status=completed
+https://your-domain.com/api/v1/timeline.csv?scope=kabkot&kab_kota=Batam
+https://your-domain.com/api/v1/leaderboard.csv?bidang=Produksi
 ```
 
 ### JavaScript Fetch
@@ -313,7 +469,9 @@ Jika kombinasi filter tidak menghasilkan data, endpoint akan mengembalikan CSV d
 
 ### Valid Filter Values
 
-**Bidang:**
+**Scope (NEW - for issues_detail, timeline, leaderboard, workload):**
+- `provinsi` - BPS Provinsi Kepulauan Riau staff
+- `kabkot` - BPS Kabupaten/Kota staff
 - `Sosial`
 - `Produksi`
 - `Distribusi`

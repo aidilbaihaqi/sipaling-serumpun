@@ -14,13 +14,18 @@ func NewRouter(s *Server) http.Handler {
 	})
 
 	r.Route("/api/v1", func(r chi.Router) {
-		// Core KPI endpoints
-		r.Get("/kpi_provinsi.csv", s.KPIProvinsi)
-		r.Get("/kpi_kabkot.csv", s.KPIKabkot)
+		// Core KPI endpoints (using SQL templates)
+		r.Get("/kpi_provinsi.csv", s.KPIProvinsiTemplate)
+		r.Get("/kpi_kabkot.csv", s.KPIKabkotTemplate)
 
-		// Supporting endpoints
-		r.Get("/heatmap.csv", s.Heatmap)
-		r.Get("/issues_detail.csv", s.IssuesDetail)
+		// Supporting endpoints (using SQL templates)
+		r.Get("/heatmap.csv", s.HeatmapTemplate)
+		r.Get("/issues_detail.csv", s.IssuesDetailTemplate)
+
+		// Advanced analytics endpoints (using SQL templates)
+		r.Get("/timeline.csv", s.TimelineTemplate)
+		r.Get("/leaderboard.csv", s.LeaderboardTemplate)
+		r.Get("/workload.csv", s.WorkloadTemplate)
 	})
 
 	return r

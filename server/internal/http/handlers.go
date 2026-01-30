@@ -197,14 +197,15 @@ ORDER BY kab_kota, bidang;
 // GET /api/v1/issues_detail.csv
 func (s *Server) IssuesDetail(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters for filtering
+	filterScope := r.URL.Query().Get("scope") // provinsi | kabkot
 	filterKabKota := r.URL.Query().Get("kab_kota")
 	filterBidang := r.URL.Query().Get("bidang")
 	filterStatus := r.URL.Query().Get("status")
 
 	// Build cache key with filters
 	cacheKey := "issues_detail"
-	if filterKabKota != "" || filterBidang != "" || filterStatus != "" {
-		cacheKey += "_" + filterKabKota + "_" + filterBidang + "_" + filterStatus
+	if filterScope != "" || filterKabKota != "" || filterBidang != "" || filterStatus != "" {
+		cacheKey += "_" + filterScope + "_" + filterKabKota + "_" + filterBidang + "_" + filterStatus
 	}
 
 	// Check cache
@@ -228,16 +229,20 @@ func (s *Server) IssuesDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build email -> nama mapping from ALL directory entries (provinsi + kabkot)
-	var namaCases []string
+	// Build email -> nama + scope mapping from ALL directory entries (provinsi + kabkot)
+	var namaCases, scopeCases []string
 	allRows := append(dir.Provinsi, dir.Kabkot...)
 	for _, row := range allRows {
 		email := strings.ToLower(row.Email)
 		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+sanitizeSQL(row.Nama)+"'")
+		scopeCases = append(scopeCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Scope+"'")
 	}
 
 	// Build WHERE clause for filters
 	var filterClauses []string
+	if filterScope != "" {
+		filterClauses = append(filterClauses, "  scope = '"+sanitizeSQL(filterScope)+"'")
+	}
 	if filterKabKota != "" {
 		filterClauses = append(filterClauses, "  kab_kota = '"+sanitizeSQL(filterKabKota)+"'")
 	}
@@ -255,7 +260,7 @@ func (s *Server) IssuesDetail(w http.ResponseWriter, r *http.Request) {
 
 	// Build dynamic SQL
 	sql := `
--- Issues Detail: Get ketua_bidang nama from CSV
+-- Issues Detail: Get ketua_bidang nama from CSV (Provinsi + Kabkot)
 WITH 
 base AS (
   SELECT
@@ -277,6 +282,12 @@ base AS (
         '-'
       )
     END AS assignee_name,
+
+    -- Get scope from CSV
+    CASE
+` + strings.Join(scopeCases, "\n") + `
+      ELSE 'unknown'
+    END AS scope,
 
     -- ekstraksi kode kab/kota
     SUBSTRING(
@@ -310,9 +321,11 @@ latest_comment AS (
 ),
 final AS (
   SELECT
+    b.scope,
     b.issue_title,
     CASE
       WHEN b.assignee_id IS NULL THEN 'Belum Ditugaskan'
+      WHEN b.scope = 'provinsi' THEN 'BPS Provinsi Kepulauan Riau'
       WHEN b.kab_kode IS NULL THEN 'Kode Kab/Kota Tidak Terbaca'
       WHEN b.kab_kode = '2101' THEN 'Karimun'
       WHEN b.kab_kode = '2102' THEN 'Bintan'
@@ -335,7 +348,7 @@ final AS (
   LEFT JOIN latest_comment lc ON lc.issue_id = b.issue_id
 )
 SELECT * FROM final` + whereClause + `
-ORDER BY issue_title;
+ORDER BY scope, issue_title;
 `
 
 	// Execute query
@@ -691,4 +704,515 @@ ORDER BY d.instansi, d.jabatan, d.bidang;
 // sanitizeSQL escapes single quotes in SQL string literals to prevent SQL injection
 func sanitizeSQL(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
+}
+
+// GET /api/v1/timeline.csv
+func (s *Server) Timeline(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters for filtering
+	filterScope := r.URL.Query().Get("scope") // provinsi | kabkot
+	filterKabKota := r.URL.Query().Get("kab_kota")
+	filterBidang := r.URL.Query().Get("bidang")
+	filterStatus := r.URL.Query().Get("status")
+
+	// Build cache key with filters
+	cacheKey := "timeline"
+	if filterScope != "" || filterKabKota != "" || filterBidang != "" || filterStatus != "" {
+		cacheKey += "_" + filterScope + "_" + filterKabKota + "_" + filterBidang + "_" + filterStatus
+	}
+
+	// Check cache
+	if b, ok := s.Cache.Get(cacheKey); ok {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=30")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
+		return
+	}
+
+	// Load directory from CSV
+	csvPath := os.Getenv("DIRECTORY_CSV_PATH")
+	if csvPath == "" {
+		csvPath = "data/daftar_pengguna_serumpun.csv"
+	}
+
+	dir, err := LoadDirectoryFromCSV(csvPath)
+	if err != nil {
+		http.Error(w, "failed to load directory: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Build email -> nama + scope mapping
+	var namaCases, scopeCases []string
+	allRows := append(dir.Provinsi, dir.Kabkot...)
+	for _, row := range allRows {
+		email := strings.ToLower(row.Email)
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+sanitizeSQL(row.Nama)+"'")
+		scopeCases = append(scopeCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Scope+"'")
+	}
+
+	// Build WHERE clause for filters
+	var filterClauses []string
+	if filterScope != "" {
+		filterClauses = append(filterClauses, "  scope = '"+sanitizeSQL(filterScope)+"'")
+	}
+	if filterKabKota != "" {
+		filterClauses = append(filterClauses, "  kab_kota = '"+sanitizeSQL(filterKabKota)+"'")
+	}
+	if filterBidang != "" {
+		filterClauses = append(filterClauses, "  bidang = '"+sanitizeSQL(filterBidang)+"'")
+	}
+	if filterStatus != "" {
+		filterClauses = append(filterClauses, "  status = '"+sanitizeSQL(filterStatus)+"'")
+	}
+
+	whereClause := ""
+	if len(filterClauses) > 0 {
+		whereClause = "\nWHERE\n" + strings.Join(filterClauses, "\n  AND ")
+	}
+
+	// Build dynamic SQL
+	sql := `
+-- Timeline: Deadline tracking for Gantt Chart
+WITH 
+base AS (
+  SELECT
+    i.id AS issue_id,
+    i.name AS issue_title,
+    s."group" AS status,
+    i.start_date,
+    i.target_date,
+    i.created_at,
+
+    ia.assignee_id,
+    u.email AS assignee_email,
+
+    -- Get nama from CSV
+    CASE
+` + strings.Join(namaCases, "\n") + `
+      ELSE COALESCE(u.display_name, u.first_name || ' ' || u.last_name, '-')
+    END AS assignee_name,
+
+    -- Get scope from CSV
+    CASE
+` + strings.Join(scopeCases, "\n") + `
+      ELSE 'unknown'
+    END AS scope,
+
+    -- ekstraksi kode kab/kota
+    SUBSTRING(
+      COALESCE(u.display_name,'') || ' ' ||
+      COALESCE(u.first_name,'')   || ' ' ||
+      COALESCE(u.last_name,''),
+      '(21[0-9]{2})'
+    ) AS kab_kode,
+
+    l.name AS bidang
+  FROM issues i
+  JOIN projects p ON p.id = i.project_id
+  JOIN workspaces w ON w.id = p.workspace_id
+  JOIN states s ON s.id = i.state_id
+  LEFT JOIN issue_assignees ia ON ia.issue_id = i.id AND ia.deleted_at IS NULL
+  LEFT JOIN users u ON u.id = ia.assignee_id
+  LEFT JOIN issue_labels il ON il.issue_id = i.id AND il.deleted_at IS NULL
+  LEFT JOIN labels l ON l.id = il.label_id
+  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'::uuid
+    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'::uuid
+    AND i.deleted_at IS NULL
+    AND s."group" != 'cancelled'
+),
+final AS (
+  SELECT
+    b.scope,
+    b.issue_title,
+    b.assignee_name AS ketua_bidang,
+    CASE
+      WHEN b.assignee_id IS NULL THEN 'Belum Ditugaskan'
+      WHEN b.scope = 'provinsi' THEN 'BPS Provinsi Kepulauan Riau'
+      WHEN b.kab_kode IS NULL THEN 'Kode Kab/Kota Tidak Terbaca'
+      WHEN b.kab_kode = '2101' THEN 'Karimun'
+      WHEN b.kab_kode = '2102' THEN 'Bintan'
+      WHEN b.kab_kode = '2103' THEN 'Natuna'
+      WHEN b.kab_kode = '2104' THEN 'Lingga'
+      WHEN b.kab_kode = '2105' THEN 'Kep. Anambas'
+      WHEN b.kab_kode = '2171' THEN 'Batam'
+      WHEN b.kab_kode = '2172' THEN 'Tanjung Pinang'
+      ELSE 'Lainnya'
+    END AS kab_kota,
+    COALESCE(b.bidang, '-') AS bidang,
+    b.status,
+    b.start_date,
+    b.target_date,
+    CASE
+      WHEN b.target_date IS NULL THEN NULL
+      ELSE (b.target_date - CURRENT_DATE)
+    END AS days_remaining,
+    CASE
+      WHEN b.target_date IS NULL THEN 'No Deadline'
+      WHEN b.status = 'completed' THEN 'Completed'
+      WHEN b.target_date < CURRENT_DATE THEN 'Overdue'
+      WHEN (b.target_date - CURRENT_DATE) <= 7 THEN 'Warning'
+      ELSE 'On Track'
+    END AS deadline_status,
+    CASE
+      WHEN b.status = 'completed' THEN 100
+      WHEN b.status IN ('started', 'triage') THEN 50
+      WHEN b.status = 'unstarted' THEN 25
+      ELSE 0
+    END AS progress_percent
+  FROM base b
+)
+SELECT * FROM final` + whereClause + `
+ORDER BY 
+  CASE 
+    WHEN deadline_status = 'Overdue' THEN 1
+    WHEN deadline_status = 'Warning' THEN 2
+    WHEN deadline_status = 'On Track' THEN 3
+    WHEN deadline_status = 'Completed' THEN 4
+    ELSE 5
+  END,
+  days_remaining NULLS LAST,
+  scope,
+  kab_kota;
+`
+
+	// Execute query
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	b, err := QueryToCSV(ctx, s.DB, sql)
+	if err != nil {
+		http.Error(w, "query failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Set cache
+	s.Cache.Set(cacheKey, b)
+
+	// Write response
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(b)
+}
+
+// GET /api/v1/leaderboard.csv
+func (s *Server) Leaderboard(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters for filtering
+	filterScope := r.URL.Query().Get("scope") // provinsi | kabkot
+	filterBidang := r.URL.Query().Get("bidang")
+
+	// Build cache key with filters
+	cacheKey := "leaderboard"
+	if filterScope != "" || filterBidang != "" {
+		cacheKey += "_" + filterScope + "_" + filterBidang
+	}
+
+	// Check cache
+	if b, ok := s.Cache.Get(cacheKey); ok {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=30")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
+		return
+	}
+
+	// Load directory from CSV
+	csvPath := os.Getenv("DIRECTORY_CSV_PATH")
+	if csvPath == "" {
+		csvPath = "data/daftar_pengguna_serumpun.csv"
+	}
+
+	dir, err := LoadDirectoryFromCSV(csvPath)
+	if err != nil {
+		http.Error(w, "failed to load directory: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Build email -> nama + scope + instansi mapping
+	var namaCases, scopeCases, instansiCases []string
+	for _, row := range dir.Provinsi {
+		email := strings.ToLower(row.Email)
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+sanitizeSQL(row.Nama)+"'")
+		scopeCases = append(scopeCases, "      WHEN LOWER(u.email) = '"+email+"' THEN 'provinsi'")
+		instansiCases = append(instansiCases, "      WHEN LOWER(u.email) = '"+email+"' THEN 'BPS Provinsi Kepulauan Riau'")
+	}
+	for _, row := range dir.Kabkot {
+		email := strings.ToLower(row.Email)
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+sanitizeSQL(row.Nama)+"'")
+		scopeCases = append(scopeCases, "      WHEN LOWER(u.email) = '"+email+"' THEN 'kabkot'")
+		instansiCases = append(instansiCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Instansi+"'")
+	}
+
+	// Build WHERE clause for filters
+	var filterClauses []string
+	if filterScope != "" {
+		filterClauses = append(filterClauses, "  scope = '"+sanitizeSQL(filterScope)+"'")
+	}
+	if filterBidang != "" {
+		filterClauses = append(filterClauses, "  bidang = '"+sanitizeSQL(filterBidang)+"'")
+	}
+
+	whereClause := ""
+	if len(filterClauses) > 0 {
+		whereClause = "\nWHERE\n" + strings.Join(filterClauses, "\n  AND ")
+	}
+
+	// Build dynamic SQL
+	sql := `
+-- Leaderboard: Top performers ranking
+WITH 
+user_stats AS (
+  SELECT
+    ia.assignee_id,
+    l.name AS bidang,
+    COUNT(*) AS total_issues,
+    COUNT(*) FILTER (WHERE s."group" = 'completed') AS total_completed,
+    COUNT(*) FILTER (WHERE s."group" IN ('started', 'triage')) AS in_progress,
+    AVG(
+      CASE 
+        WHEN s."group" = 'completed' AND i.start_date IS NOT NULL AND i.completed_at IS NOT NULL
+        THEN EXTRACT(EPOCH FROM (i.completed_at - i.start_date)) / 86400.0
+        ELSE NULL
+      END
+    ) AS avg_completion_days
+  FROM issues i
+  JOIN projects p ON p.id = i.project_id
+  JOIN workspaces w ON w.id = p.workspace_id
+  JOIN states s ON s.id = i.state_id
+  JOIN issue_assignees ia ON ia.issue_id = i.id AND ia.deleted_at IS NULL
+  JOIN issue_labels il ON il.issue_id = i.id AND il.deleted_at IS NULL
+  JOIN labels l ON l.id = il.label_id
+  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'
+    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'
+    AND i.deleted_at IS NULL
+    AND s."group" != 'cancelled'
+  GROUP BY ia.assignee_id, l.name
+),
+final AS (
+  SELECT
+    CASE
+` + strings.Join(namaCases, "\n") + `
+      ELSE COALESCE(u.display_name, u.first_name || ' ' || u.last_name, '-')
+    END AS nama,
+    CASE
+` + strings.Join(instansiCases, "\n") + `
+      ELSE '-'
+    END AS instansi,
+    CASE
+` + strings.Join(scopeCases, "\n") + `
+      ELSE 'unknown'
+    END AS scope,
+    us.bidang,
+    us.total_completed,
+    us.total_issues,
+    CASE
+      WHEN us.total_issues = 0 THEN 0
+      ELSE ROUND((us.total_completed::numeric * 100) / us.total_issues::numeric, 2)
+    END AS completion_rate,
+    COALESCE(ROUND(us.avg_completion_days::numeric, 1), 0) AS avg_completion_days,
+    us.in_progress
+  FROM user_stats us
+  JOIN users u ON u.id = us.assignee_id
+  WHERE us.total_issues > 0
+)
+SELECT
+  ROW_NUMBER() OVER (ORDER BY completion_rate DESC, total_completed DESC, avg_completion_days ASC) AS rank,
+  nama,
+  instansi,
+  scope,
+  bidang,
+  total_completed,
+  total_issues,
+  completion_rate,
+  avg_completion_days,
+  in_progress,
+  CASE
+    WHEN ROW_NUMBER() OVER (ORDER BY completion_rate DESC, total_completed DESC, avg_completion_days ASC) <= 3 THEN 'Gold'
+    WHEN ROW_NUMBER() OVER (ORDER BY completion_rate DESC, total_completed DESC, avg_completion_days ASC) <= 10 THEN 'Silver'
+    WHEN ROW_NUMBER() OVER (ORDER BY completion_rate DESC, total_completed DESC, avg_completion_days ASC) <= 20 THEN 'Bronze'
+    ELSE 'Participant'
+  END AS badge
+FROM final` + whereClause + `
+ORDER BY rank;
+`
+
+	// Execute query
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	b, err := QueryToCSV(ctx, s.DB, sql)
+	if err != nil {
+		http.Error(w, "query failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Set cache
+	s.Cache.Set(cacheKey, b)
+
+	// Write response
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(b)
+}
+
+// GET /api/v1/workload.csv
+func (s *Server) Workload(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters for filtering
+	filterScope := r.URL.Query().Get("scope") // provinsi | kabkot
+	filterBidang := r.URL.Query().Get("bidang")
+
+	// Build cache key with filters
+	cacheKey := "workload"
+	if filterScope != "" || filterBidang != "" {
+		cacheKey += "_" + filterScope + "_" + filterBidang
+	}
+
+	// Check cache
+	if b, ok := s.Cache.Get(cacheKey); ok {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=30")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
+		return
+	}
+
+	// Load directory from CSV
+	csvPath := os.Getenv("DIRECTORY_CSV_PATH")
+	if csvPath == "" {
+		csvPath = "data/daftar_pengguna_serumpun.csv"
+	}
+
+	dir, err := LoadDirectoryFromCSV(csvPath)
+	if err != nil {
+		http.Error(w, "failed to load directory: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Build email -> nama + scope + instansi mapping
+	var namaCases, scopeCases, instansiCases []string
+	for _, row := range dir.Provinsi {
+		email := strings.ToLower(row.Email)
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+sanitizeSQL(row.Nama)+"'")
+		scopeCases = append(scopeCases, "      WHEN LOWER(u.email) = '"+email+"' THEN 'provinsi'")
+		instansiCases = append(instansiCases, "      WHEN LOWER(u.email) = '"+email+"' THEN 'BPS Provinsi Kepulauan Riau'")
+	}
+	for _, row := range dir.Kabkot {
+		email := strings.ToLower(row.Email)
+		namaCases = append(namaCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+sanitizeSQL(row.Nama)+"'")
+		scopeCases = append(scopeCases, "      WHEN LOWER(u.email) = '"+email+"' THEN 'kabkot'")
+		instansiCases = append(instansiCases, "      WHEN LOWER(u.email) = '"+email+"' THEN '"+row.Instansi+"'")
+	}
+
+	// Build WHERE clause for filters
+	var filterClauses []string
+	if filterScope != "" {
+		filterClauses = append(filterClauses, "  scope = '"+sanitizeSQL(filterScope)+"'")
+	}
+	if filterBidang != "" {
+		filterClauses = append(filterClauses, "  bidang = '"+sanitizeSQL(filterBidang)+"'")
+	}
+
+	whereClause := ""
+	if len(filterClauses) > 0 {
+		whereClause = "\nWHERE\n" + strings.Join(filterClauses, "\n  AND ")
+	}
+
+	// Build dynamic SQL
+	sql := `
+-- Workload: Distribution and balance check
+WITH 
+user_stats AS (
+  SELECT
+    ia.assignee_id,
+    l.name AS bidang,
+    COUNT(*) FILTER (WHERE s."group" != 'completed') AS active_issues,
+    COUNT(*) FILTER (WHERE s."group" = 'completed') AS completed_issues,
+    COUNT(*) AS total_issues,
+    AVG(
+      CASE 
+        WHEN s."group" = 'completed' AND i.start_date IS NOT NULL AND i.completed_at IS NOT NULL
+        THEN EXTRACT(EPOCH FROM (i.completed_at - i.start_date)) / 86400.0
+        ELSE NULL
+      END
+    ) AS avg_days_to_complete
+  FROM issues i
+  JOIN projects p ON p.id = i.project_id
+  JOIN workspaces w ON w.id = p.workspace_id
+  JOIN states s ON s.id = i.state_id
+  JOIN issue_assignees ia ON ia.issue_id = i.id AND ia.deleted_at IS NULL
+  JOIN issue_labels il ON il.issue_id = i.id AND il.deleted_at IS NULL
+  JOIN labels l ON l.id = il.label_id
+  WHERE w.id = '58f6ec9b-f0ae-4e68-8f05-8f1d9ddf9cac'
+    AND p.id = 'cfc12151-e169-4caf-bca9-3eb83ed588ee'
+    AND i.deleted_at IS NULL
+    AND s."group" != 'cancelled'
+  GROUP BY ia.assignee_id, l.name
+),
+avg_workload AS (
+  SELECT
+    AVG(active_issues) AS avg_active_issues
+  FROM user_stats
+),
+final AS (
+  SELECT
+    CASE
+` + strings.Join(namaCases, "\n") + `
+      ELSE COALESCE(u.display_name, u.first_name || ' ' || u.last_name, '-')
+    END AS nama,
+    CASE
+` + strings.Join(instansiCases, "\n") + `
+      ELSE '-'
+    END AS instansi,
+    CASE
+` + strings.Join(scopeCases, "\n") + `
+      ELSE 'unknown'
+    END AS scope,
+    us.bidang,
+    us.active_issues,
+    us.completed_issues,
+    us.total_issues,
+    ROUND(aw.avg_active_issues::numeric, 1) AS avg_issues_per_person,
+    CASE
+      WHEN us.total_issues = 0 THEN 0
+      ELSE ROUND((us.completed_issues::numeric * 100) / us.total_issues::numeric, 2)
+    END AS completion_rate,
+    COALESCE(ROUND(us.avg_days_to_complete::numeric, 1), 0) AS avg_days_to_complete,
+    CASE
+      WHEN us.active_issues > aw.avg_active_issues * 1.5 THEN 'Overloaded'
+      WHEN us.active_issues < aw.avg_active_issues * 0.5 THEN 'Underutilized'
+      ELSE 'Balanced'
+    END AS workload_status
+  FROM user_stats us
+  CROSS JOIN avg_workload aw
+  JOIN users u ON u.id = us.assignee_id
+)
+SELECT * FROM final` + whereClause + `
+ORDER BY 
+  CASE workload_status
+    WHEN 'Overloaded' THEN 1
+    WHEN 'Balanced' THEN 2
+    WHEN 'Underutilized' THEN 3
+  END,
+  active_issues DESC;
+`
+
+	// Execute query
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	b, err := QueryToCSV(ctx, s.DB, sql)
+	if err != nil {
+		http.Error(w, "query failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Set cache
+	s.Cache.Set(cacheKey, b)
+
+	// Write response
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(b)
 }
